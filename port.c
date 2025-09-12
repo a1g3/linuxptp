@@ -3731,10 +3731,6 @@ struct port *port_open(const char *phc_device,
 		pr_err("%s: spp not supported on one-step ports", p->log_name);
 		goto err_uc_service;
 	}
-	if (port_has_security(p) && (config_get_int(cfg, NULL, "ptp_minor_version") < 1)) {
-		pr_err("%s: spp needs at least PTPv2.1", p->log_name);
-		goto err_uc_service;
-	}
 
 	/* Set fault timeouts to a default value */
 	for (i = 0; i < FT_CNT; i++) {
