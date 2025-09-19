@@ -251,7 +251,7 @@ int sad_verify(struct mac_data *mac_data,
             pr_err("ED25519 verification failed");
             return -1;
         }
-        return ret == 1; // Signature is valid
+        return !ret; // Signature is valid
     }
 }
 
