@@ -7,7 +7,7 @@
 #ifndef HAVE_SAD_PRIVATE_H
 #define HAVE_SAD_PRIVATE_H
 
-#define MAX_DIGEST_LENGTH 32
+#define MAX_DIGEST_LENGTH 64
 
 #include <sys/queue.h>
 
