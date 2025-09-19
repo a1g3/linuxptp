@@ -21,6 +21,7 @@ static struct integrity_alg_info supported_algorithms [] = {
 	{ "SHA256",     HMAC_SHA256,     0,  32 },
 	{ "AES128",     CMAC_AES128,     16, 16 },
 	{ "AES256",     CMAC_AES256,     32, 16 },
+	{ "ED25519",    ED25519,         32, 64 },
 	{ NULL, 0, 0, 0 },
 };
 

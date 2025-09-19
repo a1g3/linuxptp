@@ -52,66 +52,66 @@ user_flags()
 	done
 
 	# Look for nettle support.
-	for d in $dirs; do
-		sdirs=$(find $d -type d -name "nettle")
-		for s in $sdirs; do
-			have_hmac="0"
-			files=$(find $s -type f -name hmac.h)
-			for f in $files; do
-				if grep -q hmac_sha256_set_key $f; then
-					have_hmac="1"
-					break 1;
-				fi
-			done
-			have_memops="0"
-			files=$(find $s -type f -name memops.h)
-			for f in $files; do
-				if grep -q memeql_sec $f; then
-					have_memops="1"
-					break 1;
-				fi
-			done
-			have_nettle_meta="0"
-			files=$(find $s -type f -name nettle-meta.h)
-			for f in $files; do
-				if grep -q nettle_get_macs $f; then
-					have_nettle_meta="1"
-					break 1;
-				fi
-			done
-			if [ $have_hmac = "1" ] &&
-			   [ $have_memops = "1" ] &&
-			   [ $have_nettle_meta = "1" ]; then
-				printf " -DHAVE_NETTLE"
-				break 2
-			fi
-		done
-	done
+	#for d in $dirs; do
+	#	sdirs=$(find $d -type d -name "nettle")
+	#	for s in $sdirs; do
+	#		have_hmac="0"
+	#		files=$(find $s -type f -name hmac.h)
+	#		for f in $files; do
+	#			if grep -q hmac_sha256_set_key $f; then
+	#				have_hmac="1"
+	#				break 1;
+	#			fi
+	#		done
+	#		have_memops="0"
+	#		files=$(find $s -type f -name memops.h)
+	#		for f in $files; do
+	#			if grep -q memeql_sec $f; then
+	#				have_memops="1"
+	#				break 1;
+	#			fi
+	#		done
+	#		have_nettle_meta="0"
+	#		files=$(find $s -type f -name nettle-meta.h)
+	#		for f in $files; do
+	#			if grep -q nettle_get_macs $f; then
+	#				have_nettle_meta="1"
+	#				break 1;
+	#			fi
+	#		done
+	#		if [ $have_hmac = "1" ] &&
+	#		   [ $have_memops = "1" ] &&
+	#		   [ $have_nettle_meta = "1" ]; then
+	#			printf " -DHAVE_NETTLE"
+	#			break 2
+	#		fi
+	#	done
+	#done
 
 	# Look for gnutls support.
-	for d in $dirs; do
-		sdirs=$(find $d -type d -name "gnutls")
-		for s in $sdirs; do
-			files=$(find $s -type f -name crypto.h)
-			for f in $files; do
-				if grep -q gnutls_hmac_init $f; then
-					printf " -DHAVE_GNUTLS"
-					break 3
-				fi
-			done
-		done
-	done
+	#for d in $dirs; do
+	#	sdirs=$(find $d -type d -name "gnutls")
+	#	for s in $sdirs; do
+	#		files=$(find $s -type f -name crypto.h)
+	#		for f in $files; do
+	#			if grep -q gnutls_hmac_init $f; then
+	#				printf " -DHAVE_GNUTLS"
+	#				break 3
+	#			fi
+	#		done
+	#	done
+	#done
 
-	# Look for gnupg support.
-	for d in $dirs; do
-		files=$(find $d -type f -name gcrypt.h)
-		for f in $files; do
-			if grep -q gcry_mac_open $f; then
-				printf " -DHAVE_GNUPG"
-				break 2
-			fi
-		done
-	done
+	## Look for gnupg support.
+	#for d in $dirs; do
+	#	files=$(find $d -type f -name gcrypt.h)
+	#	for f in $files; do
+	#		if grep -q gcry_mac_open $f; then
+	#			printf " -DHAVE_GNUPG"
+	#			break 2
+	#		fi
+	#	done
+	#done
 
 	# Look for wolfcrypt support.
 	for d in $dirs; do
@@ -125,32 +125,32 @@ user_flags()
 	done
 
 	# Look for openssl support.
-	for d in $dirs; do
-		sdirs=$(find $d -type d -name "openssl")
-		for s in $sdirs; do
-			have_crypto="0"
-			files=$(find $s -type f -name crypto.h)
-			for f in $files; do
-				if grep -q CRYPTO_memcmp $f; then
-					have_crypto="1"
-					break 1;
-				fi
-			done
-			have_evp="0"
-			files=$(find $s -type f -name evp.h)
-			for f in $files; do
-				if grep -q EVP_MAC_init $f; then
-					have_evp="1"
-					break 1;
-				fi
-			done
-			if [ $have_crypto = "1" ] &&
-			   [ $have_evp = "1" ]; then
-				printf " -DHAVE_OPENSSL"
-				break 2
-			fi
-		done
-	done
+	#for d in $dirs; do
+	#	sdirs=$(find $d -type d -name "openssl")
+	#	for s in $sdirs; do
+	#		have_crypto="0"
+	#		files=$(find $s -type f -name crypto.h)
+	#		for f in $files; do
+	#			if grep -q CRYPTO_memcmp $f; then
+	#				have_crypto="1"
+	#				break 1;
+	#			fi
+	#		done
+	#		have_evp="0"
+	#		files=$(find $s -type f -name evp.h)
+	#		for f in $files; do
+	#			if grep -q EVP_MAC_init $f; then
+	#				have_evp="1"
+	#				break 1;
+	#			fi
+	#		done
+	#		if [ $have_crypto = "1" ] &&
+	#		   [ $have_evp = "1" ]; then
+	#			printf " -DHAVE_OPENSSL"
+	#			break 2
+	#		fi
+	#	done
+	#done
 
 	# Look for libcap support.
 	for d in $dirs; do

@@ -19,6 +19,7 @@ typedef enum {
 	HMAC_SHA256,
 	CMAC_AES128,
 	CMAC_AES256,
+	ED25519,
 } integrity_alg_type;
 
 struct integrity_alg_info {
