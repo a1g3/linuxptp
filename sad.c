@@ -567,7 +567,7 @@ static int sad_config_parse_key(char *line, size_t line_num,
 		count++;
 		token = strtok(NULL, " \t");
 	}
-	if (count < 3 || count > 5) {
+	if (count < 3 || count > 6) {
 		pr_err("sa_file: line %zu: invalid key line:"
 			" requires format 'id type [len] str [len str]'"
 			" - ignoring", line_num);
