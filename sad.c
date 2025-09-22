@@ -554,20 +554,22 @@ static int sad_config_sa_mutable(int mutable, size_t line_num)
 
 static int sad_config_parse_key(char *line, size_t line_num,
 				size_t *id, const char **type,
-				size_t *len, char **key)
+				size_t *key1_len, size_t *key2_len, char **key1, char **key2)
 {
-	char *token, *tokens[5];
+	char *token, *tokens[7];
 	int count = 0;
+	// Will only be set with private key (if using signatures)
+	*key2 = NULL;
 
 	token = strtok(line, " \t");
-	while (token != NULL && count < 5) {
+	while (token != NULL && count < 7) {
 		tokens[count] = token;
 		count++;
 		token = strtok(NULL, " \t");
 	}
-	if (count < 3 || count > 4) {
+	if (count < 3 || count > 5) {
 		pr_err("sa_file: line %zu: invalid key line:"
-			" requires format 'id type [len] str'"
+			" requires format 'id type [len] str [len str]'"
 			" - ignoring", line_num);
 		return 0;
 	}
@@ -579,28 +581,82 @@ static int sad_config_parse_key(char *line, size_t line_num,
 	}
 	*type = tokens[1];
 	if (count == 3) {
-		*len = 0;
-		*key = tokens[2];
+		*key1_len = 0;
+		*key2_len = 0;
+		*key1 = tokens[2];
+	} else if (count == 4) {
+		if (sscanf(tokens[2], "%zu", key1_len) != 1) {
+			// Assume this is a key string, not a length
+			*key1_len = 0;
+			*key2_len = 0;
+			*key1 = tokens[2];
+			*key2 = tokens[3];
+			return 1;
+		}
+		*key1 = tokens[3];
+	} else if (count == 5) {
+		pr_err("sa_file: line %zu: must specify lengths for both keys- ignoring", line_num);
+		return 0;
 	} else {
-		if (sscanf(tokens[2], "%zu", len) != 1) {
-			pr_err("sa_file: line %zu: invalid key_len %s"
+		if (sscanf(tokens[2], "%zu", key1_len) != 1) {
+			pr_err("sa_file: line %zu: invalid key length %s"
 				" - ignoring", line_num, tokens[2]);
 			return 0;
 		}
-		*key = tokens[3];
+
+		if (sscanf(tokens[4], "%zu", key2_len) != 1) {
+			pr_err("sa_file: line %zu: invalid key length %s"
+				" - ignoring", line_num, tokens[4]);
+			return 0;
+		}
+		*key1 = tokens[3];
+		*key2 = tokens[5];
 	}
 
 	return 1;
 }
 
+static int sad_process_key_string(char *key_str, size_t *key_len, size_t line_num)
+{
+    int i;
+    *key_len = strlen(key_str);
+    if (strncmp(key_str, "ASCII:", 6) == 0) {
+        memmove(key_str, key_str + 6, *key_len - 6);
+        *key_len = *key_len - 6;
+    } else if (strncmp(key_str, "HEX:", 4) == 0) {
+        memmove(key_str, key_str + 4, *key_len - 4);
+        *key_len = *key_len - 4;
+        if (*key_len % 2) {
+            pr_err("sa_file: line %zu: invalid key length %zu,"
+                " hex keys must have even length"
+                " - ignoring", line_num, *key_len);
+            return -1;
+        }
+        for (i = 0; i < *key_len; i += 2) {
+            const char hex_pair[3] = { key_str[i], key_str[i + 1], '\0' };
+            long value = strtol(hex_pair, NULL, 16);
+            key_str[i / 2] = (char) value;
+        }
+        *key_len = *key_len / 2;
+    } else if (strncmp(key_str, "B64:", 4) == 0) {
+        if(!base64_decode(key_str + 4, *key_len - 4, key_str, key_len)) {
+            pr_err("sa_file: line %zu: invalid Base64 key"
+                " - ignoring", line_num);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+
 static int sad_config_security_association_key(size_t key_id, const char *icv_str,
-					       size_t spec_len, char *key_str,
-					       size_t line_num)
+					       size_t key1_spec_len, size_t key2_spec_len, char *key1_str,
+					       char *key2_str, size_t line_num)
 {
 	struct security_association_key *key;
 	struct integrity_alg_info *icv;
-	size_t key_len = 0;
-	int i;
+	size_t key1_len = 0;
+	size_t key2_len = 0;
 
 	if (!current_sa) {
 		pr_err("sa_file: line %zu: missing spp - ignoring",
@@ -640,56 +696,63 @@ static int sad_config_security_association_key(size_t key_id, const char *icv_st
 		free(key);
 		return -1;
 	}
-	/* process key_str */
-	key_len = strlen(key_str);
-	if (strncmp(key_str, "ASCII:", 6) == 0) {
-		memmove(key_str, key_str + 6, key_len - 6);
-		key_len = key_len - 6;
-	} else if (strncmp(key_str, "HEX:", 4) == 0) {
-		memmove(key_str, key_str + 4, key_len - 4);
-		key_len = key_len - 4;
-		if (key_len % 2) {
-			pr_err("sa_file: line %zu: invalid key length %zu,"
-				" hex keys must have even length"
-				" - ignoring", line_num, key_len);
-			free(key);
-			return -1;
-		}
-		for (i = 0; i < key_len; i += 2) {
-			const char hex_pair[3] = { key_str[i], key_str[i + 1], '\0' };
-			long value = strtol(hex_pair, NULL, 16);
-			key_str[i / 2] = (char) value;
-		}
-		key_len = key_len / 2;
-	} else if (strncmp(key_str, "B64:", 4) == 0) {
-		if(!base64_decode(key_str + 4, key_len - 4, key_str, &key_len)) {
-			pr_err("sa_file: line %zu: invalid Base64 key"
-				" - ignoring", line_num);
-			free(key);
-			return -1;
-		}
-	}
-	if (spec_len > 0 && key_len != spec_len) {
+
+	/* process key1_str */
+    if (sad_process_key_string(key1_str, &key1_len, line_num) != 0) {
+		free(key);
+        return -1;
+    }
+
+	if (key1_spec_len > 0 && key1_len != key1_spec_len) {
 		pr_err("sa_file: line %zu: invalid key length %zu,"
 			" does not match specified length %zu - ignoring",
-			line_num, key_len, spec_len);
+			line_num, key1_len, key1_spec_len);
 		free(key);
 		return -1;
 	}
-	if (icv->key_len > 0 && key_len != icv->key_len) {
+	if (icv->key_len > 0 && key1_len != icv->key_len) {
 		pr_err("sa_file: line %zu: invalid key length %zu,"
 			" does not match cipher length %zu - ignoring",
-			line_num, key_len, icv->key_len);
+			line_num, key1_len, icv->key_len);
 		free(key);
 		return -1;
 	}
-	if (key_len < 1) {
+	if (key1_len < 1) {
 		pr_err("sa_file: line %zu: invalid key length %zu,"
 			" positive key_len required - ignoring",
-			line_num, key_len);
+			line_num, key1_len);
 		free(key);
 		return -1;
 	}
+
+	/* process key2_str */
+    if (sad_process_key_string(key2_str, &key2_len, line_num) != 0) {
+		free(key);
+        return -1;
+    }
+
+	if (key2_spec_len > 0 && key2_len != key2_spec_len) {
+		pr_err("sa_file: line %zu: invalid key length %zu,"
+			" does not match specified length %zu - ignoring",
+			line_num, key2_len, key2_spec_len);
+		free(key);
+		return -1;
+	}
+	if (icv->key_len > 0 && key2_len != icv->key_len) {
+		pr_err("sa_file: line %zu: invalid key length %zu,"
+			" does not match cipher length %zu - ignoring",
+			line_num, key2_len, icv->key_len);
+		free(key);
+		return -1;
+	}
+	if (key2_len < 1) {
+		pr_err("sa_file: line %zu: invalid key length %zu,"
+			" positive key_len required - ignoring",
+			line_num, key2_len);
+		free(key);
+		return -1;
+	}
+	
 	if (icv->digest_len > MAX_DIGEST_LENGTH ||
 	    icv->digest_len < 2 ||
 	    icv->digest_len % 2 ) {
@@ -700,14 +763,14 @@ static int sad_config_security_association_key(size_t key_id, const char *icv_st
 		return -1;
 	}
 	/* initialize mac function */
-	key->data = sad_init_mac(icv->type, (unsigned char *) key_str, key_len);
+	key->data = sad_init_mac(icv->type, (unsigned char *) key1_str, (unsigned char *) key2_str, key1_len, key2_len);
 	if (!key->data) {
 		pr_err("sa_file: line %zu: key %zu init failed"
 			" - ignoring", line_num, key_id);
 		free(key);
 		return -1;
 	}
-	memset(&key_str, 0, sizeof(key_str));
+	memset(&key1_str, 0, sizeof(key1_str));
 
 	STAILQ_INSERT_TAIL(&current_sa->keys, key, list);
 
@@ -718,8 +781,8 @@ static int sad_parse_security_association_line(struct config *cfg,
 						char *line, size_t line_num)
 {
 	int spp, seqnum_len, seqid_window, res_len, mutable;
-	size_t key_id, key_len;
-	char *key_value;
+	size_t key_id, key1_len, key2_len;
+	char *key1_value, *key2_value;
 	const char *key_type;
 
 	if (sscanf(line, " spp %d", &spp) == 1)
@@ -737,9 +800,9 @@ static int sad_parse_security_association_line(struct config *cfg,
 	if (sscanf(line, " allow_mutable %d", &mutable) == 1)
 		return sad_config_sa_mutable(mutable, line_num);
 
-	if (sad_config_parse_key(line, line_num, &key_id, &key_type, &key_len, &key_value))
-		return sad_config_security_association_key(key_id, key_type, key_len,
-							   key_value, line_num);
+	if (sad_config_parse_key(line, line_num, &key_id, &key_type, &key1_len, &key2_len, &key1_value, &key2_value))
+		return sad_config_security_association_key(key_id, key_type, key1_len, key2_len,
+							   key1_value, key2_value, line_num);
 
 	return 0;
 }

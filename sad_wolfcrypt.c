@@ -48,9 +48,10 @@ void print_hex_array(const unsigned char *arr, size_t len) {
 }
 
 struct mac_data *sad_init_mac(integrity_alg_type algorithm,
-                              const unsigned char *key, size_t key_len)
+                              const unsigned char *key1, const unsigned char *key2,
+                              size_t key1_len, size_t key2_len)
 {
-    if (!key || key_len == 0 || key_len > MAX_KEY_LEN) {
+    if (!key1 || key1_len == 0 || key1_len > MAX_KEY_LEN) {
         pr_err("Invalid key or key length");
         return NULL;
     }
@@ -77,7 +78,7 @@ struct mac_data *sad_init_mac(integrity_alg_type algorithm,
                 wolfCrypt_Cleanup();
                 return NULL;
             }
-            if (wc_HmacSetKey(mac_data->hmac, SHA256, key, (word32)key_len) != 0) {
+            if (wc_HmacSetKey(mac_data->hmac, SHA256, key1, (word32)key1_len) != 0) {
                 pr_err("Failed to set HMAC key");
                 sad_deinit_mac(mac_data);
                 return NULL;
@@ -93,19 +94,19 @@ struct mac_data *sad_init_mac(integrity_alg_type algorithm,
                 wolfCrypt_Cleanup();
                 return NULL;
             }
-            if (wc_InitCmac(mac_data->cmac, key, key_len, 1, NULL) != 0) {
+            if (wc_InitCmac(mac_data->cmac, key1, key1_len, 1, NULL) != 0) {
                 pr_err("Failed to set CMAC key");
                 sad_deinit_mac(mac_data);
                 return NULL;
             }
             
-            if (key_len <= MAX_KEY_LEN) {
-                memcpy(mac_data->key, key, key_len);
+            if (key1_len <= MAX_KEY_LEN) {
+                memcpy(mac_data->key, key1, key1_len);
             } else {
                 return NULL;
             }
             mac_data->is_cmac = 1;
-            mac_data->key_len = key_len;
+            mac_data->key_len = key1_len;
             break;
 
         case ED25519:
@@ -119,18 +120,23 @@ struct mac_data *sad_init_mac(integrity_alg_type algorithm,
                 return NULL;
             }
 
-            byte priv[] = { 0x61, 0xF0, 0xFE, 0x64, 0x7C, 0xDA, 0xDD, 0x61, 0xB2, 0x24, 0x78, 0x57, 0x78, 0x07, 0x12, 0xAB, 0x69, 0xE7, 0xB5, 0x9D, 0x0B, 0xEE, 0x43, 0xF9, 0x23, 0x33, 0x4F, 0xE5, 0xC7, 0x55, 0x57, 0x0E };
-            byte pub[]  = { 0x98, 0x18, 0x30, 0xA5, 0xF7, 0x70, 0xE5, 0xCD, 0x75, 0xE7, 0x3F, 0xC8, 0x92, 0xBF, 0x5A, 0xD3, 0x2B, 0xFA, 0x5F, 0xF2, 0x96, 0x7E, 0x9E, 0x26, 0x98, 0x54, 0x19, 0x27, 0xEC, 0x39, 0xBF, 0x93 };
+            if (!key2 || key2_len == 0 || key2_len > MAX_KEY_LEN) {
+                pr_err("Invalid key or key length");
+                return NULL;
+            }
+
+            //byte priv[] = { 0x61, 0xF0, 0xFE, 0x64, 0x7C, 0xDA, 0xDD, 0x61, 0xB2, 0x24, 0x78, 0x57, 0x78, 0x07, 0x12, 0xAB, 0x69, 0xE7, 0xB5, 0x9D, 0x0B, 0xEE, 0x43, 0xF9, 0x23, 0x33, 0x4F, 0xE5, 0xC7, 0x55, 0x57, 0x0E };
+            //byte pub[]  = { 0x98, 0x18, 0x30, 0xA5, 0xF7, 0x70, 0xE5, 0xCD, 0x75, 0xE7, 0x3F, 0xC8, 0x92, 0xBF, 0x5A, 0xD3, 0x2B, 0xFA, 0x5F, 0xF2, 0x96, 0x7E, 0x9E, 0x26, 0x98, 0x54, 0x19, 0x27, 0xEC, 0x39, 0xBF, 0x93 };
 
             wc_ed25519_init(mac_data->ed25519_key);
-            ret = wc_ed25519_import_private_key(priv, sizeof(priv), pub, sizeof(pub), mac_data->ed25519_key);
+            ret = wc_ed25519_import_private_key(key2, key2_len, key1, key2_len, mac_data->ed25519_key);
             if (ret != 0) {
                 pr_err("Failed to import ED25519 key");
                 sad_deinit_mac(mac_data);
                 return NULL;
             }            
 
-            mac_data->key_len = sizeof(pub);
+            mac_data->key_len = key1_len;
             mac_data->is_ed25519 = 1;
             break;
         default:

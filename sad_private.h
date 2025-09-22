@@ -41,7 +41,8 @@ struct security_association_key {
     defined (HAVE_GNUPG) || defined (HAVE_OPENSSL) || \
 	defined (HAVE_WOLFCRYPT)
 struct mac_data *sad_init_mac(integrity_alg_type algorithm,
-			      const unsigned char *key, size_t key_len);
+                              const unsigned char *key1, const unsigned char *key2,
+                              size_t key1_len, size_t key2_len);
 
 void sad_deinit_mac(struct mac_data *parms);
 
@@ -55,8 +56,8 @@ int sad_verify(struct mac_data *mac_data,
 
 #else
 static inline struct mac_data *sad_init_mac(integrity_alg_type algorithm,
-					    const unsigned char *key,
-					    size_t key_len)
+					    const unsigned char *key1, const unsigned char *key2,
+						size_t key1_len, size_t key2_len)
 {
 	pr_err("security configured but not supported");
 	return NULL;
