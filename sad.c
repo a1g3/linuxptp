@@ -726,31 +726,33 @@ static int sad_config_security_association_key(size_t key_id, const char *icv_st
 	}
 
 	/* process key2_str */
-    if (sad_process_key_string(key2_str, &key2_len, line_num) != 0) {
-		free(key);
-        return -1;
-    }
+    if (key2_str != NULL) {
+		if (sad_process_key_string(key2_str, &key2_len, line_num) != 0) {
+			free(key);
+			return -1;
+		}
 
-	if (key2_spec_len > 0 && key2_len != key2_spec_len) {
-		pr_err("sa_file: line %zu: invalid key length %zu,"
-			" does not match specified length %zu - ignoring",
-			line_num, key2_len, key2_spec_len);
-		free(key);
-		return -1;
-	}
-	if (icv->key_len > 0 && key2_len != icv->key_len) {
-		pr_err("sa_file: line %zu: invalid key length %zu,"
-			" does not match cipher length %zu - ignoring",
-			line_num, key2_len, icv->key_len);
-		free(key);
-		return -1;
-	}
-	if (key2_len < 1) {
-		pr_err("sa_file: line %zu: invalid key length %zu,"
-			" positive key_len required - ignoring",
-			line_num, key2_len);
-		free(key);
-		return -1;
+		if (key2_spec_len > 0 && key2_len != key2_spec_len) {
+			pr_err("sa_file: line %zu: invalid key length %zu,"
+				" does not match specified length %zu - ignoring",
+				line_num, key2_len, key2_spec_len);
+			free(key);
+			return -1;
+		}
+		if (icv->key_len > 0 && key2_len != icv->key_len) {
+			pr_err("sa_file: line %zu: invalid key length %zu,"
+				" does not match cipher length %zu - ignoring",
+				line_num, key2_len, icv->key_len);
+			free(key);
+			return -1;
+		}
+		if (key2_len < 1) {
+			pr_err("sa_file: line %zu: invalid key length %zu,"
+				" positive key_len required - ignoring",
+				line_num, key2_len);
+			free(key);
+			return -1;
+		}
 	}
 	
 	if (icv->digest_len > MAX_DIGEST_LENGTH ||
@@ -771,6 +773,7 @@ static int sad_config_security_association_key(size_t key_id, const char *icv_st
 		return -1;
 	}
 	memset(&key1_str, 0, sizeof(key1_str));
+	memset(&key2_str, 0, sizeof(key2_str));
 
 	STAILQ_INSERT_TAIL(&current_sa->keys, key, list);
 
