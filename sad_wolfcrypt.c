@@ -20,7 +20,7 @@
 #define MAX_HEX_OUTPUT_LEN 1024
 #define MAX_KEY_LEN 1024
 
-enum MAC_TYPE { 
+enum __attribute__ ((__packed__)) MAC_TYPE { 
     WC_HMAC, WC_CMAC, WC_ED25519
 };
 
