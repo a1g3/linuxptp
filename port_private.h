@@ -91,6 +91,7 @@ struct port {
 		UInteger16 delayreq;
 		UInteger16 signaling;
 		UInteger16 sync;
+		UInteger16 join;
 	} seqnum;
 	tmv_t peer_delay;
 	struct tsproc *tsproc;
@@ -190,6 +191,7 @@ void fc_clear(struct foreign_clock *fc);
 void flush_delay_req(struct port *p);
 void flush_last_sync(struct port *p);
 int port_capable(struct port *p);
+int port_join(struct port *p);
 int port_clr_tmo(int fd);
 int port_delay_request(struct port *p);
 void port_disable(struct port *p);
@@ -219,6 +221,8 @@ int process_pdelay_resp(struct port *p, struct ptp_message *m);
 void process_pdelay_resp_fup(struct port *p, struct ptp_message *m);
 int process_signaling(struct port *p, struct ptp_message *m);
 void process_sync(struct port *p, struct ptp_message *m);
+int process_join_request(struct port *p, struct ptp_message *m);
+int process_join_response(struct port *p, struct ptp_message *m);
 int source_pid_eq(struct ptp_message *m1, struct ptp_message *m2);
 void ts_add(tmv_t *ts, Integer64 correction);
 

@@ -52,6 +52,8 @@
 #define ANNOUNCE              0xB
 #define SIGNALING             0xC
 #define MANAGEMENT            0xD
+#define JOIN_REQUEST          0xE
+#define JOIN_RESPONSE         0xF
 
 /* Bits for flagField[0] */
 #define ALT_MASTER     (1<<0)
@@ -178,6 +180,18 @@ struct management_msg {
 	uint8_t             suffix[0];
 } PACKED;
 
+struct join_request_msg {
+	struct ptp_header   hdr;
+	UInteger64          nonce[16];
+	uint8_t             suffix[0];
+};
+
+struct join_response_msg {
+	struct ptp_header   hdr;
+	UInteger64          nonce[16];
+	uint8_t             suffix[0];
+};
+
 struct message_data {
 	uint8_t buffer[1500];
 } PACKED;
@@ -195,6 +209,8 @@ struct ptp_message {
 		struct pdelay_resp_fup_msg pdelay_resp_fup;
 		struct signaling_msg       signaling;
 		struct management_msg      management;
+		struct join_request_msg    join_request;
+		struct join_response_msg   join_response;
 		struct message_data        data;
 	} PACKED;
 	/**/

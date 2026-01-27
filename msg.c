@@ -120,6 +120,10 @@ static uint8_t *msg_suffix(struct ptp_message *m)
 		return m->signaling.suffix;
 	case MANAGEMENT:
 		return m->management.suffix;
+	case JOIN_REQUEST:
+		return m->join_request.suffix;
+	case JOIN_RESPONSE:
+		return m->join_response.suffix;
 	}
 	return NULL;
 }
@@ -343,7 +347,7 @@ void msg_get(struct ptp_message *m)
 
 int msg_post_recv(struct ptp_message *m, int cnt)
 {
-	int err, pdulen, suffix_len, type;
+	int err, pdulen, suffix_len, type, i;
 
 	if (cnt < sizeof(struct ptp_header))
 		return -EBADMSG;
@@ -385,6 +389,12 @@ int msg_post_recv(struct ptp_message *m, int cnt)
 	case MANAGEMENT:
 		pdulen = sizeof(struct management_msg);
 		break;
+	case JOIN_REQUEST:
+		pdulen = sizeof(struct join_request_msg);
+		break;
+	case JOIN_RESPONSE:
+		pdulen = sizeof(struct join_response_msg);
+		break;
 	default:
 		return -EBADMSG;
 	}
@@ -425,6 +435,16 @@ int msg_post_recv(struct ptp_message *m, int cnt)
 		break;
 	case MANAGEMENT:
 		port_id_post_recv(&m->management.targetPortIdentity);
+		break;
+	case JOIN_REQUEST:
+		for (i = 0; i < 16; i++) {
+			m->join_request.nonce[i] = net2host64(m->join_request.nonce[i]);
+		}
+		break;
+	case JOIN_RESPONSE:
+		for (i = 0; i < 16; i++) {
+			m->join_response.nonce[i] = net2host64(m->join_response.nonce[i]);
+		}
 		break;
 	}
 
@@ -562,6 +582,10 @@ const char *msg_type_string(int type)
 		return "SIGNALING";
 	case MANAGEMENT:
 		return "MANAGEMENT";
+	case JOIN_REQUEST:
+		return "JOIN_REQUEST";
+	case JOIN_RESPONSE:
+		return "JOIN_RESPONSE";
 	}
 	return "unknown";
 }

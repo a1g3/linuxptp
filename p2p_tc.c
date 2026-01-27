@@ -31,6 +31,7 @@ static int p2p_delay_request(struct port *p)
 	case PS_INITIALIZING:
 	case PS_FAULTY:
 	case PS_DISABLED:
+	case PS_JOINING:
 		return 0;
 	case PS_LISTENING:
 	case PS_PRE_MASTER:
@@ -66,6 +67,7 @@ void p2p_dispatch(struct port *p, enum fsm_event event, int mdiff)
 	 */
 	switch (p->state) {
 	case PS_INITIALIZING:
+	case PS_JOINING:
 		break;
 	case PS_FAULTY:
 	case PS_DISABLED:

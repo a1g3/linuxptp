@@ -1916,6 +1916,7 @@ int port_is_enabled(struct port *p)
 	case PS_DISABLED:
 		return 0;
 	case PS_LISTENING:
+	case PS_JOINING:
 	case PS_PRE_MASTER:
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
@@ -2232,6 +2233,7 @@ int process_announce(struct port *p, struct ptp_message *m)
 	case PS_INITIALIZING:
 	case PS_FAULTY:
 	case PS_DISABLED:
+	case PS_JOINING:
 		break;
 	case PS_LISTENING:
 	case PS_PRE_MASTER:
@@ -2437,6 +2439,7 @@ void process_follow_up(struct port *p, struct ptp_message *m)
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
 	case PS_PASSIVE:
+	case PS_JOINING:
 		return;
 	case PS_UNCALIBRATED:
 	case PS_SLAVE:
@@ -2752,6 +2755,7 @@ void process_sync(struct port *p, struct ptp_message *m)
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
 	case PS_PASSIVE:
+	case PS_JOINING:
 		return;
 	case PS_UNCALIBRATED:
 	case PS_SLAVE:
@@ -2867,6 +2871,9 @@ static void port_e2e_transition(struct port *p, enum port_state next)
 	switch (next) {
 	case PS_INITIALIZING:
 		break;
+	case PS_JOINING:
+		port_join(p);
+		break;
 	case PS_FAULTY:
 	case PS_DISABLED:
 		port_disable(p);
@@ -2913,6 +2920,9 @@ static void port_p2p_transition(struct port *p, enum port_state next)
 
 	switch (next) {
 	case PS_INITIALIZING:
+		break;
+	case PS_JOINING:
+		port_join(p);
 		break;
 	case PS_FAULTY:
 	case PS_DISABLED:
@@ -2961,6 +2971,8 @@ static void bc_dispatch(struct port *p, enum fsm_event event, int mdiff)
 		}
 	}
 
+	pr_info("In BC dispatch: port %s event %d state %d",
+		p->log_name, event,  p->state);
 	if (!port_state_update(p, event, mdiff)) {
 		return;
 	}
@@ -3228,6 +3240,22 @@ static enum fsm_event bc_event(struct port *p, int fd_index)
 		}
 		return EV_NONE;
 	}
+
+	// AG TODO: Add handling here for JOIN_RESPONSE messages
+	if (p->state == PS_JOINING) {
+		if (msg_type(msg) == JOIN_RESPONSE) {
+			event = process_join_response(p, msg);
+			// process join response in normal flow below
+			return event;
+		}
+
+		// If we are trying to join, ignore all other message types
+		if (dup) {
+			msg_put(dup);
+		}
+		return EV_NONE;
+	}
+
 	if (msg_sots_missing(msg) &&
 	    !(p->timestamping == TS_P2P1STEP && msg_type(msg) == PDELAY_REQ)) {
 		pr_err("%s: received %s without timestamp",
@@ -3300,6 +3328,13 @@ static enum fsm_event bc_event(struct port *p, int fd_index)
 		if (clock_manage(p->clock, p, msg))
 			event = EV_STATE_DECISION_EVENT;
 		break;
+	case JOIN_REQUEST:
+		if (process_join_request(p, msg))
+			event = EV_FAULT_DETECTED;
+		break;
+	case JOIN_RESPONSE:
+		process_join_response(p, msg);
+		break;
 	}
 
 	msg_put(msg);
@@ -3337,7 +3372,7 @@ int port_prepare_and_send(struct port *p, struct ptp_message *msg,
 			  enum transport_event event)
 {
 	int cnt;
-	if (port_has_security(p)) {
+	if (port_has_security(p) && (p->state == PS_MASTER || p->state == PS_GRAND_MASTER)) {
 		cnt = sad_append_auth_tlv(clock_config(p->clock), p->spp,
 					  p->active_key_id, msg);
 	} else {

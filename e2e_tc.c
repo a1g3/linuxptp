@@ -47,6 +47,7 @@ void e2e_dispatch(struct port *p, enum fsm_event event, int mdiff)
 	 */
 	switch (p->state) {
 	case PS_INITIALIZING:
+	case PS_JOINING:
 		break;
 	case PS_FAULTY:
 	case PS_DISABLED:

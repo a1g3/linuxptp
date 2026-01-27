@@ -139,6 +139,7 @@ int process_signaling(struct port *p, struct ptp_message *m)
 	case PS_INITIALIZING:
 	case PS_FAULTY:
 	case PS_DISABLED:
+	case PS_JOINING:
 		return 0;
 	case PS_LISTENING:
 	case PS_PRE_MASTER:

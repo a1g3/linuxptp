@@ -78,6 +78,7 @@ static int tc_blocked(struct port *q, struct port *p, struct ptp_message *m)
 	case PS_LISTENING:
 	case PS_PRE_MASTER:
 	case PS_PASSIVE:
+	case PS_JOINING:
 		return 1;
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
@@ -99,6 +100,7 @@ static int tc_blocked(struct port *q, struct port *p, struct ptp_message *m)
 	case PS_LISTENING:
 	case PS_PRE_MASTER:
 	case PS_PASSIVE:
+	case PS_JOINING:
 		return 1;
 	case PS_UNCALIBRATED:
 	case PS_SLAVE:
