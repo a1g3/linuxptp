@@ -469,6 +469,11 @@ int msg_pre_send(struct ptp_message *m)
 	type = msg_type(m);
 
 	switch (type) {
+	case JOIN_REQUEST:
+		for (int i = 0; i < 16; i++) {
+			m->join_request.nonce[i] = host2net64(m->join_request.nonce[i]);
+		}
+		break;
 	case SYNC:
 		break;
 	case DELAY_REQ:
@@ -500,6 +505,11 @@ int msg_pre_send(struct ptp_message *m)
 		break;
 	case MANAGEMENT:
 		port_id_pre_send(&m->management.targetPortIdentity);
+		break;
+	case JOIN_RESPONSE:
+		for (int i = 0; i < 16; i++) {
+			m->join_response.nonce[i] = host2net64(m->join_response.nonce[i]);
+		}
 		break;
 	default:
 		return -1;

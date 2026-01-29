@@ -2891,6 +2891,8 @@ static void port_e2e_transition(struct port *p, enum port_state next)
 			set_tmo_log(p->fda.fd[FD_MANNO_TIMER], 1, -10); /*~1ms*/
 		}
 		port_set_sync_tx_tmo(p);
+		// AG TODO: Generate keys here!
+		// AG TODO: Set sequence number
 		sad_set_last_seqid(clock_config(p->clock), p->spp, -1);
 		break;
 	case PS_PASSIVE:
@@ -2974,6 +2976,15 @@ static void bc_dispatch(struct port *p, enum fsm_event event, int mdiff)
 	pr_info("In BC dispatch: port %s event %d state %d",
 		p->log_name, event,  p->state);
 	if (!port_state_update(p, event, mdiff)) {
+		return;
+	}
+
+	/* Send JOIN_REQUEST when a new master is selected */
+	if (mdiff && event == EV_RS_SLAVE &&
+	    (p->state == PS_UNCALIBRATED || p->state == PS_SLAVE)) {
+		pr_notice("%s: new master selected, sending JOIN_REQUEST",
+			  p->log_name);
+		port_dispatch(p, EV_SEND_JOIN_REQUEST, 0);
 		return;
 	}
 

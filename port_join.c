@@ -83,25 +83,29 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	struct ptp_message *msg;
 	int err;
 
-	/* Validate port state */
+	/* Validate port state - only process if we are a master */
 	switch (p->state) {
+	case PS_MASTER:
+	case PS_GRAND_MASTER:
+		/* Master clocks can respond to JOIN_REQUEST */
+		break;
 	case PS_INITIALIZING:
 	case PS_FAULTY:
 	case PS_DISABLED:
 	case PS_LISTENING:
 	case PS_PRE_MASTER:
-	case PS_MASTER:
-	case PS_GRAND_MASTER:
 	case PS_PASSIVE:
 	case PS_UNCALIBRATED:
 	case PS_SLAVE:
-		return 0;
 	case PS_JOINING:
-		break;
+		/* Non-master states ignore JOIN_REQUEST */
+		return 0;
 	}
 
-	pr_debug("%s: received JOIN_REQUEST nonce[0]=0x%lx fr",
-		 p->log_name, m->join_request.nonce[0]);
+	pr_debug("%s: received JOIN_REQUEST from %s, nonce[0]=0x%lx",
+		 p->log_name,
+		 pid2str(&m->header.sourcePortIdentity),
+		 m->join_request.nonce[0]);
 
 	/* Construct JOIN_RESPONSE */
 	msg = msg_allocate();
@@ -129,6 +133,10 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	err = port_prepare_and_send(p, msg, TRANS_GENERAL);
 	if (err) {
 		pr_err("%s: send JOIN_RESPONSE failed", p->log_name);
+	} else {
+		pr_info("%s: sent JOIN_RESPONSE to %s",
+			p->log_name,
+			pid2str(&m->header.sourcePortIdentity));
 	}
 
 	msg_put(msg);
