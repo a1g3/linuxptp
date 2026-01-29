@@ -2990,7 +2990,7 @@ static void bc_dispatch(struct port *p, enum fsm_event event, int mdiff)
 		pr_notice("%s: new master selected, sending JOIN_REQUEST",
 			  p->log_name);
 		p->state = PS_JOINING;
-		//port_dispatch(p, EV_SEND_JOIN_REQUEST, 0);
+		port_join(p);
 		return;
 	}
 
@@ -3283,22 +3283,26 @@ static enum fsm_event bc_event(struct port *p, int fd_index)
 		}
 		return EV_NONE;
 	}
-	err = sad_process_auth(clock_config(p->clock), p->spp, msg, dup);
-	if (err) {
-		switch (err) {
-		case -EBADMSG:
-			pr_err("%s: auth: bad message", p->log_name);
-			break;
-		case -EPROTO:
-			pr_debug("%s: auth: ignoring message", p->log_name);
-			break;
+
+	if (msg_type(msg) != JOIN_REQUEST) {
+		err = sad_process_auth(clock_config(p->clock), p->spp, msg, dup);
+		if (err) {
+			switch (err) {
+			case -EBADMSG:
+				pr_err("%s: auth: bad message", p->log_name);
+				break;
+			case -EPROTO:
+				pr_debug("%s: auth: ignoring message", p->log_name);
+				break;
+			}
+			msg_put(msg);
+			if (dup) {
+				msg_put(dup);
+			}
+			return EV_NONE;
 		}
-		msg_put(msg);
-		if (dup) {
-			msg_put(dup);
-		}
-		return EV_NONE;
 	}
+	
 	if (msg_sots_valid(msg)) {
 		ts_add(&msg->hwts.ts, -p->rx_timestamp_offset);
 		if (p->state == PS_SLAVE) {
