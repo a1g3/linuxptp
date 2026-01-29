@@ -47,7 +47,6 @@ int transport_send(struct transport *t, struct fdarray *fda,
 		   enum transport_event event, struct ptp_message *msg)
 {
 	int len = ntohs(msg->header.messageLength);
-	pr_info("transport_type: len=%d", t->type);
 
 	return t->send(t, fda, event, 0, msg, len, NULL, &msg->hwts);
 }

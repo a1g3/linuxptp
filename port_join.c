@@ -56,6 +56,7 @@ int port_join(struct port *p)
 	}
 
 	msg->header.tsmt = JOIN_REQUEST | p->transportSpecific;
+	pr_err("[port_join] Header is 0x%08X", msg->header.tsmt);
 	msg->header.ver = PTP_VERSION;
 	msg->header.messageLength = sizeof(struct join_request_msg);
 	msg->header.domainNumber       = clock_domain_number(p->clock);
