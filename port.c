@@ -45,6 +45,8 @@
 #include "unicast_client.h"
 #include "unicast_service.h"
 #include "util.h"
+#include "transport_private.h"
+
 
 #define ANNOUNCE_SPAN 1
 #define CMLDS_SUBSCRIPTION_INTERVAL	60 /*seconds*/
@@ -2979,9 +2981,11 @@ static void bc_dispatch(struct port *p, enum fsm_event event, int mdiff)
 		return;
 	}
 
+	struct transport *t = p->trp;
+
 	/* Send JOIN_REQUEST when a new master is selected */
 	if (mdiff && event == EV_RS_SLAVE &&
-	    (p->state == PS_UNCALIBRATED || p->state == PS_SLAVE)) {
+	    (p->state == PS_UNCALIBRATED || p->state == PS_SLAVE) && t->type != TRANS_UDS) {
 		pr_notice("%s: new master selected, sending JOIN_REQUEST",
 			  p->log_name);
 		port_dispatch(p, EV_SEND_JOIN_REQUEST, 0);
