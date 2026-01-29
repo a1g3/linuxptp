@@ -250,7 +250,7 @@ enum port_state ptp_slave_fsm(enum port_state state, enum fsm_event event,
 			next = PS_FAULTY;
 			break;
 		case EV_INIT_COMPLETE:
-			next = PS_JOINING;
+			next = PS_LISTENING;
 			break;
 		default:
 			break;
@@ -263,7 +263,7 @@ enum port_state ptp_slave_fsm(enum port_state state, enum fsm_event event,
 			next = PS_FAULTY;
 			break;
 		case EV_JOINED:
-			next = PS_LISTENING;
+			next = PS_UNCALIBRATED;
 			break;
 		default:
 			break;
