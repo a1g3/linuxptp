@@ -2874,6 +2874,7 @@ static void port_e2e_transition(struct port *p, enum port_state next)
 	case PS_INITIALIZING:
 		break;
 	case PS_JOINING:
+		pr_debug("[port_e2e_transition] %s: joining port", p->log_name);
 		port_join(p);
 		break;
 	case PS_FAULTY:
@@ -2985,10 +2986,11 @@ static void bc_dispatch(struct port *p, enum fsm_event event, int mdiff)
 
 	/* Send JOIN_REQUEST when a new master is selected */
 	if (mdiff && event == EV_RS_SLAVE &&
-	    (p->state == PS_UNCALIBRATED || p->state == PS_SLAVE) && t->type != TRANS_UDS) {
+	    (p->state == PS_UNCALIBRATED || p->state == PS_SLAVE ) && t->type != TRANS_UDS) {
 		pr_notice("%s: new master selected, sending JOIN_REQUEST",
 			  p->log_name);
-		port_dispatch(p, EV_SEND_JOIN_REQUEST, 0);
+		p->state = PS_JOINING;
+		//port_dispatch(p, EV_SEND_JOIN_REQUEST, 0);
 		return;
 	}
 
