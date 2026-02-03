@@ -20,20 +20,6 @@
 #define MAX_HEX_OUTPUT_LEN 1024
 #define MAX_KEY_LEN 1024
 
-enum __attribute__ ((__packed__)) MAC_TYPE { 
-    WC_HMAC, WC_CMAC, WC_ED25519
-};
-
-struct mac_data {
-    union {
-        ed25519_key *ed25519_key;
-        Hmac *hmac;
-        Cmac *cmac;
-    } wolfssl;
-    enum MAC_TYPE type;
-    unsigned char key[MAX_KEY_LEN];
-    int key_len;
-};
 
 void print_hex_array(const unsigned char *arr, size_t len) {
     if (!arr || len == 0 || len * 2 + 1 > MAX_HEX_OUTPUT_LEN) {

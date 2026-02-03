@@ -40,8 +40,42 @@ static inline struct security_association *sad_get_association(struct config *cf
 	return NULL;
 }
 
+/* spp should be in the range [0 - 255] */
+struct security_association *sad_get_sa_association(struct config *cfg,
+								int spp)
+{
+	struct security_association *sa;
+	STAILQ_FOREACH(sa, &cfg->security_association_database, list) {
+		if (sa->spp == spp) {
+			return sa;
+		}
+	}
+
+	pr_debug("sa %u not present", spp);
+	return NULL;
+}
+
 /* key_id should be in the range [1 - 2^32-1] */
 static inline struct security_association_key *sad_get_key(struct security_association *sa,
+							   size_t key_id)
+{
+	struct security_association_key *key;
+	if (key_id < 1 || key_id > UINT32_MAX) {
+		return NULL;
+	}
+
+	STAILQ_FOREACH(key, &sa->keys, list) {
+		if (key->key_id == key_id) {
+			return key;
+		}
+	}
+
+	pr_debug("sa %u: key %zu not present", sa->spp, key_id);
+	return NULL;
+}
+
+/* key_id should be in the range [1 - 2^32-1] */
+struct security_association_key *sad_get_key_by_id(struct security_association *sa,
 							   size_t key_id)
 {
 	struct security_association_key *key;

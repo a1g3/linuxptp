@@ -26,6 +26,8 @@
 #include "unicast_client.h"
 #include "unicast_fsm.h"
 #include "util.h"
+#include "sad.h"
+#include "sad_private.h"
 
 /**
  * Generate a random nonce for JOIN_REQUEST
@@ -63,7 +65,7 @@ int port_join(struct port *p)
 	msg->header.sourcePortIdentity = p->portIdentity;
 	msg->header.sequenceId = p->seqnum.join++;
 	//msg->header.control = 0x05; /* All others */
-	msg->header.logMessageInterval = 0x7f;
+	msg->header.logMessageInterval = 0x0;
 
 	/* Generate random nonce */
 	generate_nonce(msg->join_request.nonce);
@@ -81,6 +83,7 @@ int port_join(struct port *p)
  */
 int process_join_request(struct port *p, struct ptp_message *m)
 {
+	struct join_request_msg *req = &m->join_request;
 	struct ptp_message *msg;
 	int err;
 
@@ -106,7 +109,7 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	pr_debug("%s: received JOIN_REQUEST from %s, nonce[0]=0x%lx",
 		 p->log_name,
 		 pid2str(&m->header.sourcePortIdentity),
-		 m->join_request.nonce[0]);
+		 req->nonce[0]);
 
 	/* Construct JOIN_RESPONSE */
 	msg = msg_allocate();
@@ -122,14 +125,30 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	msg->header.sourcePortIdentity = p->portIdentity;
 	msg->header.sequenceId = m->header.sequenceId;
 	msg->header.control = 0x05; /* All others */
-	msg->header.logMessageInterval = 0x7f;
-	msg->header.flagField[0] = UNICAST;
+	msg->header.logMessageInterval = 0x0;
 
 	/* Echo back the nonce */
-	memcpy(msg->join_response.nonce, m->join_request.nonce, sizeof(msg->join_response.nonce));
+	memcpy(msg->join_response.nonce, req->nonce, sizeof(msg->join_response.nonce));
+	int sppId = p->spp;
+	struct security_association *sa = sad_get_sa_association(clock_config(p->clock), sppId);
+	if (!sa) {
+		pr_err("%s: no security association for spp %d", p->log_name, sppId);
+		msg_put(msg);
+		return -1;
+	}
+	struct security_association_key *key = sad_get_key_by_id(sa, p->active_key_id);
+	if(!key) {
+		pr_err("%s: no key id %d for sa %d", p->log_name, p->active_key_id, sppId);
+		msg_put(msg);
+		return -1;
+	}
+	/* For JOIN_RESPONSE, the key is placed directly after the nonce */
+	memcpy(msg->join_response.key, key->data->key, key->data->key_len); // Ed25519
 
 	/* Set destination address */
 	msg->address = m->address;
+
+	pr_info("%s: sent JOIN_RESPONSE to %s", p->log_name, pid2str(&m->header.sourcePortIdentity));
 
 	err = port_prepare_and_send(p, msg, TRANS_GENERAL);
 	if (err) {

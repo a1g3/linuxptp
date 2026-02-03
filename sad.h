@@ -98,4 +98,10 @@ void sad_destroy(struct config *cfg);
 int sad_readiness_check(int spp, size_t active_key_id,
                         struct config *cfg);
 
+struct security_association *sad_get_sa_association(struct config *cfg,
+								int spp);
+
+struct security_association_key *sad_get_key_by_id(struct security_association *sa,
+							   size_t key_id);
+
 #endif

@@ -10,6 +10,10 @@
 #define MAX_DIGEST_LENGTH 64
 
 #include <sys/queue.h>
+#include <wolfssl/options.h>
+#include <wolfssl/wolfcrypt/hmac.h>
+#include <wolfssl/wolfcrypt/cmac.h>
+#include <wolfssl/wolfcrypt/ed25519.h>
 
 #include "pdt.h"
 
@@ -29,7 +33,23 @@ struct integrity_alg_info {
 	size_t             digest_len; /* length of icv */
 };
 
-struct mac_data;
+#define MAX_KEY_LEN 1024
+
+enum __attribute__ ((__packed__)) MAC_TYPE { 
+    WC_HMAC, WC_CMAC, WC_ED25519
+};
+
+struct mac_data {
+    union {
+        ed25519_key *ed25519_key;
+        Hmac *hmac;
+        Cmac *cmac;
+    } wolfssl;
+    enum MAC_TYPE type;
+    unsigned char key[MAX_KEY_LEN];
+    int key_len;
+};
+
 struct security_association_key {
 	STAILQ_ENTRY(security_association_key) list;
 	struct integrity_alg_info *icv;

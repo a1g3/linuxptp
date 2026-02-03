@@ -3393,7 +3393,7 @@ int port_prepare_and_send(struct port *p, struct ptp_message *msg,
 			  enum transport_event event)
 {
 	int cnt;
-	if (port_has_security(p) && (p->state == PS_MASTER || p->state == PS_GRAND_MASTER)) {
+	if (port_has_security(p) && (p->state == PS_MASTER || p->state == PS_GRAND_MASTER) && msg_type(msg) != JOIN_RESPONSE) {
 		cnt = sad_append_auth_tlv(clock_config(p->clock), p->spp,
 					  p->active_key_id, msg);
 	} else {
