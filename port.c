@@ -2982,17 +2982,20 @@ static void bc_dispatch(struct port *p, enum fsm_event event, int mdiff)
 		return;
 	}
 
-	struct transport *t = p->trp;
-
+	
 	/* Send JOIN_REQUEST when a new master is selected */
-	if (mdiff && event == EV_RS_SLAVE &&
+	if (!port_has_security(p)) {
+		struct transport *t = p->trp;
+		if (mdiff && event == EV_RS_SLAVE &&
 	    (p->state == PS_UNCALIBRATED || p->state == PS_SLAVE ) && t->type != TRANS_UDS) {
-		pr_notice("%s: new master selected, sending JOIN_REQUEST",
-			  p->log_name);
-		p->state = PS_JOINING;
-		port_join(p);
-		return;
+			pr_notice("%s: new master selected, sending JOIN_REQUEST",
+				p->log_name);
+			p->state = PS_JOINING;
+			port_join(p);
+			return;
+		}
 	}
+
 
 	switch (p->delayMechanism) {
 	case DM_COMMON_P2P:
@@ -3285,6 +3288,7 @@ static enum fsm_event bc_event(struct port *p, int fd_index)
 	}
 
 	if (msg_type(msg) != JOIN_REQUEST) {
+		//pr_err("%s sad_process_auth: spp=%d", p->log_name, p->spp);
 		err = sad_process_auth(clock_config(p->clock), p->spp, msg, dup);
 		if (err) {
 			switch (err) {

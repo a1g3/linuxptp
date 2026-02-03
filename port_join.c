@@ -221,9 +221,9 @@ int process_join_response(struct port *p, struct ptp_message *m)
 	pr_info("Add Key ID: %d", key_id);
 	print_hex_array((unsigned char *)resp->key, 32);
 	pr_err("%s: JOIN_RESPONSE security readiness check passed", p->log_name);
-	while (1) {
 
-	}
+	p->state = PS_UNCALIBRATED;
+	port_dispatch(p, EV_RS_SLAVE, 1);
 
-	return EV_JOINED;
+	return EV_NONE;
 }

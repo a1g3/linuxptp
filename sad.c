@@ -343,13 +343,13 @@ static int sad_check_auth_tlv(struct security_association *sa,
 		}
 		auth = (struct authentication_tlv *) extra->tlv;
 
-		/* verify spp matches expectations */
-		if (sa->spp != auth->spp) {
-			pr_debug("sa %u: received auth tlv"
-				 " with unexpected spp %u",
-				 sa->spp, auth->spp);
-			return -EBADMSG;
-		}
+		///* verify spp matches expectations */
+		//if (sa->spp != auth->spp) {
+		//	pr_err("sa %u: received auth tlv"
+		//		 " with unexpected spp %u",
+		//		 sa->spp, auth->spp);
+		//	return -EBADMSG;
+		//}
 
 		/* verify res, seqnum, disclosedKey field indicators match expectations */
 		if ((sa->res_ind != ((auth->secParamIndicator & 0x1) != 0)) ||
@@ -434,11 +434,13 @@ int sad_process_auth(struct config *cfg, int spp,
 	/* retrieve sa specified by spp */
 	sa = sad_get_association(cfg, spp);
 	if (!sa) {
+		pr_err("sad_process_auth: could not retrieve spp=%d", spp);
 		return -EPROTO;
 	}
 	/* check seqid in header first (sync/followup only) */
 	err = sad_check_seqid(msg, sa->last_seqid, sa->seqid_window);
 	if (err) {
+		pr_err("sad_process_auth: seqid check failed for spp=%d", spp);
 		return err;
 	}
 	/* detect and process any auth tlvs  */
