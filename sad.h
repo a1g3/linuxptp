@@ -104,4 +104,8 @@ struct security_association *sad_get_sa_association(struct config *cfg,
 struct security_association_key *sad_get_key_by_id(struct security_association *sa,
 							   size_t key_id);
 
+int sad_config_init_join(struct config *cfg, int spp);
+int sad_add_key_join(UInteger64 key_id, unsigned char *key, UInteger32 key_len);
+int sad_readiness_check_join(int spp, size_t active_key_id, struct config *cfg);
+
 #endif

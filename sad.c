@@ -1004,3 +1004,116 @@ int sad_readiness_check(int spp, size_t active_key_id, struct config *cfg)
         }
         return 0;
 }
+
+
+int sad_config_init_join(struct config *cfg, int spp)
+{
+	struct security_association *sa;
+	current_sa = NULL;
+
+	if (spp < 0 || spp > UINT8_MAX) {
+		pr_err("spp %d is out of range. "
+			"Must be in the range %d to %d - ignoring",
+			spp, 0, UINT8_MAX);
+		return -1;
+	}
+	STAILQ_FOREACH(sa, &cfg->security_association_database, list) {
+		if (sa->spp == spp) {
+			pr_err("sa %u already taken"
+				" - ignoring", spp);
+			return -1;
+		}
+	}
+	sa = calloc(1, sizeof(*sa));
+	if (!sa) {
+		pr_err("low memory");
+		return -1;
+	}
+	STAILQ_INIT(&sa->keys);
+	sa->spp = spp;
+	/* set defaults */
+	sa->seqnum_ind = FALSE;
+	sa->seqnum_len = 0;
+	sa->seqid_window = 3;
+	sa->immediate_ind = TRUE;
+	sa->res_ind = FALSE;
+	sa->res_len = 0;
+	sa->mutable = FALSE;
+	sa->last_seqid = -1;
+
+	STAILQ_INSERT_TAIL(&cfg->security_association_database, sa, list);
+	current_sa = sa;
+
+	return 0;
+}
+
+int sad_add_key_join(UInteger64 key_id, unsigned char *key, UInteger32 key_len)
+{
+	struct security_association_key *sa_key;
+	
+	sa_key = calloc(1, sizeof(*sa_key));
+	if (!sa_key) {
+		pr_err("low memory");
+		return -1;
+	}
+
+	sa_key->key_id = key_id;
+	sa_key->icv = &supported_algorithms[3]; // Default to AES256_CMAC
+
+
+	//pr_err("key: %s", key);
+	sa_key->data = sad_init_mac(sa_key->icv->type, (unsigned char *)key, NULL, key_len, 0);
+	if (!sa_key->data) {
+		pr_err("key %lu init failed"
+			" - ignoring", key_id);
+		free(sa_key);
+		return -1;
+	}
+
+	STAILQ_INSERT_TAIL(&current_sa->keys, sa_key, list);
+
+	return 0;
+}
+
+int sad_readiness_check_join(int spp, size_t active_key_id, struct config *cfg)
+{
+        struct security_association *sa;
+        if (spp < 0 && active_key_id < 1) {
+                return 0;
+        }
+#if !defined (HAVE_NETTLE) && !defined (HAVE_GNUTLS) && \
+    !defined (HAVE_GNUPG) && !defined (HAVE_OPENSSL) && \
+	!defined (HAVE_WOLFCRYPT)
+        if (spp >= 0 || active_key_id > 0) {
+                pr_err("spp or active_key_id set but security not supported");
+                return -1;
+        }
+#endif
+        if (spp >= 0) {
+                if (STAILQ_EMPTY(&cfg->security_association_database)) {
+                        pr_err("spp set but sad is empty");
+                        return -1;
+                }
+                sa = sad_get_association(cfg, spp);
+                if (!sa) {
+                        pr_err("spp set but sa %u not defined", spp);
+                        return -1;
+                }
+                if (active_key_id < 1) {
+                        pr_err("active_key_id required when spp set");
+                        return -1;
+                } else {
+                        if (!sad_get_key(sa, active_key_id)) {
+                                pr_err("sa %u: active_key_id set but key %zu"
+                                        " not defined", spp, active_key_id);
+                                return -1;
+                        }
+                }
+        } else {
+                if (active_key_id > 0) {
+                        pr_err("spp required when active_key_id set");
+                        return -1;
+                }
+        }
+        return 0;
+}

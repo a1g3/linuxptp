@@ -142,6 +142,8 @@ int process_join_request(struct port *p, struct ptp_message *m)
 		msg_put(msg);
 		return -1;
 	}
+
+	msg->join_response.key_id = ntohl(key->key_id);
 	/* For JOIN_RESPONSE, the key is placed directly after the nonce */
 	memcpy(msg->join_response.key, key->data->key, key->data->key_len); // Ed25519
 
@@ -168,8 +170,60 @@ int process_join_request(struct port *p, struct ptp_message *m)
  */
 int process_join_response(struct port *p, struct ptp_message *m)
 {
-	if (p->state == PS_JOINING && msg_type(m) == JOIN_RESPONSE) {
-		return EV_JOINED;
+	struct join_response_msg *resp = &m->join_response;
+
+	/* Validate port state - only process if we are a master */
+	switch (p->state) {
+	case PS_MASTER:
+	case PS_GRAND_MASTER:
+	case PS_INITIALIZING:
+	case PS_FAULTY:
+	case PS_DISABLED:
+	case PS_LISTENING:
+	case PS_PRE_MASTER:
+	case PS_PASSIVE:
+	case PS_UNCALIBRATED:
+	case PS_SLAVE:
+	/* Master clocks can respond to JOIN_REQUEST */
+		return 0;
+	case PS_JOINING:
+		/* Non-master states ignore JOIN_REQUEST */
+		break;
 	}
-	return EV_NONE;
+
+	if (msg_type(m) != JOIN_RESPONSE) {
+		pr_err("%s: received non-JOIN_RESPONSE message", p->log_name);
+		return 0;
+	}
+
+	int sad = sad_config_init_join(clock_config(p->clock), 100);
+	if (sad != 0) {
+		pr_err("%s: JOIN_RESPONSE security association init failed", p->log_name);
+		return -1;
+	}
+
+	UInteger32 key_id = htonl(resp->key_id);
+	int key = sad_add_key_join(key_id, (unsigned char *)resp->key, sizeof(resp->key));
+	if (key != 0) {
+		pr_err("%s: JOIN_RESPONSE security key add failed", p->log_name);
+		return -1;
+	}
+
+	p->spp = 100;
+	p->active_key_id = key_id;
+
+	int ret = sad_readiness_check_join(p->spp, p->active_key_id, clock_config(p->clock));
+	if (ret != 0) {
+		pr_err("%s: JOIN_RESPONSE security readiness check failed", p->log_name);
+		return -1;
+	}
+
+	pr_info("Add Key ID: %d", key_id);
+	print_hex_array((unsigned char *)resp->key, 32);
+	pr_err("%s: JOIN_RESPONSE security readiness check passed", p->log_name);
+	while (1) {
+
+	}
+
+	return EV_JOINED;
 }
