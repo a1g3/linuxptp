@@ -23,6 +23,9 @@ struct security_association {
 	UInteger16 res_len;       /* value of “R” in Table 131 */
 	Boolean    mutable;       /* allow for mutable correction */
 	Integer32  last_seqid;
+	char ca_file[255];
+	char certificate_path[255];
+	char certificate_key_path[255];
 };
 
 /**

@@ -533,6 +533,47 @@ static int sad_config_sa_res_len(int res_len, size_t line_num)
 	return 0;
 }
 
+static int sad_config_sa_ca_file(const char *ca_file, size_t line_num){
+	if (!current_sa) {
+		pr_err("sa_file: line %zu: missing spp - ignoring",
+			line_num);
+		return -1;
+	}
+
+	strncpy(current_sa->ca_file, ca_file, sizeof(current_sa->ca_file) - 1);
+	current_sa->ca_file[sizeof(current_sa->ca_file) - 1] = '\0';
+
+	return 0;
+}
+
+static int sad_config_sa_certificate_file(const char *certificate_file, size_t line_num)
+{
+	if (!current_sa) {
+		pr_err("sa_file: line %zu: missing spp - ignoring",
+			line_num);
+		return -1;
+	}
+
+	strncpy(current_sa->certificate_path, certificate_file, sizeof(current_sa->certificate_path) - 1);
+	current_sa->certificate_path[sizeof(current_sa->certificate_path) - 1] = '\0';
+
+	return 0;
+}
+
+static int sad_config_sa_certificate_key_file(const char *certificate_key_file, size_t line_num)
+{
+	if (!current_sa) {
+		pr_err("sa_file: line %zu: missing spp - ignoring",
+			line_num);
+		return -1;
+	}
+
+	strncpy(current_sa->certificate_key_path, certificate_key_file, sizeof(current_sa->certificate_key_path) - 1);
+	current_sa->certificate_key_path[sizeof(current_sa->certificate_key_path) - 1] = '\0';
+
+	return 0;
+}
+
 static int sad_config_sa_mutable(int mutable, size_t line_num)
 {
 	if (!current_sa) {
@@ -787,6 +828,7 @@ static int sad_parse_security_association_line(struct config *cfg,
 	size_t key_id, key1_len, key2_len;
 	char *key1_value, *key2_value;
 	const char *key_type;
+	char certificate_file[256], certificate_key_file[256], ca_file[256];
 
 	if (sscanf(line, " spp %d", &spp) == 1)
 		return sad_config_switch_security_association(cfg, spp, line_num);
@@ -802,6 +844,15 @@ static int sad_parse_security_association_line(struct config *cfg,
 
 	if (sscanf(line, " allow_mutable %d", &mutable) == 1)
 		return sad_config_sa_mutable(mutable, line_num);
+
+	if (sscanf(line, " ca_file %s", ca_file) == 1)
+		return sad_config_sa_ca_file(ca_file, line_num);
+
+	if (sscanf(line, " certificate_file %s", certificate_file) == 1)
+		return sad_config_sa_certificate_file(certificate_file, line_num);
+
+	if (sscanf(line, " certificate_key_file %s", certificate_key_file) == 1)
+		return sad_config_sa_certificate_key_file(certificate_key_file, line_num);
 
 	if (sad_config_parse_key(line, line_num, &key_id, &key_type, &key1_len, &key2_len, &key1_value, &key2_value))
 		return sad_config_security_association_key(key_id, key_type, key1_len, key2_len,
