@@ -45,7 +45,7 @@ enum port_state ptp_fsm(enum port_state state, enum fsm_event event, int mdiff)
 			next = PS_FAULTY;
 			break;
 		case EV_JOINED:
-			next = PS_UNCALIBRATED;
+			next = PS_SLAVE;
 			break;
 		default:
 			break;
@@ -177,7 +177,7 @@ enum port_state ptp_fsm(enum port_state state, enum fsm_event event, int mdiff)
 			next = PS_MASTER;
 			break;
 		case EV_MASTER_CLOCK_SELECTED:
-			next = PS_SLAVE;
+			next = PS_JOINING;
 			break;
 		case EV_RS_MASTER:
 			next = PS_PRE_MASTER;

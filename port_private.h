@@ -168,6 +168,8 @@ struct port {
 	bool unicast_state_dirty;
 	int spp;
 	UInteger32 active_key_id;
+	int master_spp;
+	UInteger32 master_active_key_id;
 	struct {
 		unsigned int timer_count;
 		time_t last_renewal;

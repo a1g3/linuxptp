@@ -2900,7 +2900,8 @@ static void port_e2e_transition(struct port *p, enum port_state next)
 			set_tmo_log(p->fda.fd[FD_MANNO_TIMER], 1, -10); /*~1ms*/
 		}
 		port_set_sync_tx_tmo(p);
-		// AG TODO: Generate keys here!
+		p->spp = p->master_spp;
+		p->active_key_id = p->master_active_key_id;
 		// AG TODO: Set sequence number
 		sad_set_last_seqid(clock_config(p->clock), p->spp, -1);
 		break;
@@ -2953,6 +2954,8 @@ static void port_p2p_transition(struct port *p, enum port_state next)
 			set_tmo_log(p->fda.fd[FD_MANNO_TIMER], 1, -10); /*~1ms*/
 		}
 		port_set_sync_tx_tmo(p);
+
+
 		sad_set_last_seqid(clock_config(p->clock), p->spp, -1);
 		break;
 	case PS_PASSIVE:
@@ -3279,7 +3282,7 @@ static enum fsm_event bc_event(struct port *p, int fd_index)
 		return EV_NONE;
 	}
 
-	if (msg_type(msg) != JOIN_REQUEST && msg_type(msg) != DELAY_REQ) {
+	if (msg_type(msg) != JOIN_REQUEST && msg_type(msg) != DELAY_REQ && msg_type(msg) != MANAGEMENT) {
 		//pr_err("%s sad_process_auth: spp=%d", p->log_name, p->spp);
 		err = sad_process_auth(clock_config(p->clock), p->spp, msg, dup);
 		if (err && err != -ENOKEY) {
@@ -3743,8 +3746,10 @@ struct port *port_open(const char *phc_device,
 		config_get_int(cfg, p->name, "power_profile.2017.totalTimeInaccuracy");
 	p->slave_event_monitor = clock_slave_monitor(clock);
 	p->allowedLostResponses = config_get_int(cfg, p->name, "allowedLostResponses");
-	p->spp = config_get_int(cfg, p->name, "spp");
-	p->active_key_id = config_get_uint(cfg, p->name, "active_key_id");
+	p->spp = -1;
+	p->active_key_id = 0;
+	p->master_spp = config_get_int(cfg, p->name, "spp");
+	p->master_active_key_id = config_get_uint(cfg, p->name, "active_key_id");
 
 	if (str2prid(config_get_string(cfg, p->name, "profileIdentity"),
 			&p->profileIdentity)) {
