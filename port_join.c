@@ -136,6 +136,7 @@ int process_join_request(struct port *p, struct ptp_message *m)
 		msg_put(msg);
 		return -1;
 	}
+
 	struct security_association_key *key = sad_get_key_by_id(sa, p->active_key_id);
 	if(!key) {
 		pr_err("%s: no key id %d for sa %d", p->log_name, p->active_key_id, sppId);
@@ -145,7 +146,19 @@ int process_join_request(struct port *p, struct ptp_message *m)
 
 	msg->join_response.key_id = ntohl(key->key_id);
 	/* For JOIN_RESPONSE, the key is placed directly after the nonce */
-	memcpy(msg->join_response.key, key->data->key, key->data->key_len); // Ed25519
+
+	if(key->data->type == WC_ED25519) {
+		unsigned int pubSz = sizeof(msg->join_response.key);
+		int ret = wc_ed25519_export_public(key->data->wolfssl.ed25519_key, msg->join_response.key, &pubSz);
+		pr_err("Exported ED25519 public key of length %u", pubSz);
+		if (ret != 0) {
+			pr_err("%s: failed to export ED25519 public key", p->log_name);
+			msg_put(msg);
+			return -1;
+		}
+	} else {
+		memcpy(msg->join_response.key, key->data->key, key->data->key_len);
+	}
 
 	/* Set destination address */
 	msg->address = m->address;

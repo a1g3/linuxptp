@@ -429,7 +429,7 @@ int sad_process_auth(struct config *cfg, int spp,
 	int err = 0;
 	/* immediately return if security is not configured */
 	if (spp < 0) {
-		return err;
+		return -ENOKEY;
 	}
 	/* retrieve sa specified by spp */
 	sa = sad_get_association(cfg, spp);
@@ -1060,10 +1060,9 @@ int sad_add_key_join(UInteger64 key_id, unsigned char *key, UInteger32 key_len)
 	}
 
 	sa_key->key_id = key_id;
-	sa_key->icv = &supported_algorithms[3]; // Default to AES256_CMAC
+	sa_key->icv = &supported_algorithms[4]; // Default to AES256_CMAC
 
 
-	//pr_err("key: %s", key);
 	sa_key->data = sad_init_mac(sa_key->icv->type, (unsigned char *)key, NULL, key_len, 0);
 	if (!sa_key->data) {
 		pr_err("key %lu init failed"

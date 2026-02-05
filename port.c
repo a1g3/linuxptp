@@ -3282,7 +3282,7 @@ static enum fsm_event bc_event(struct port *p, int fd_index)
 	if (msg_type(msg) != JOIN_REQUEST && msg_type(msg) != DELAY_REQ) {
 		//pr_err("%s sad_process_auth: spp=%d", p->log_name, p->spp);
 		err = sad_process_auth(clock_config(p->clock), p->spp, msg, dup);
-		if (err) {
+		if (err && err != -ENOKEY) {
 			switch (err) {
 			case -EBADMSG:
 				pr_err("%s: auth: bad message", p->log_name);
@@ -3298,7 +3298,11 @@ static enum fsm_event bc_event(struct port *p, int fd_index)
 			return EV_NONE;
 		}
 
-		pr_notice("%s: auth: message authenticated: %s", p->log_name, msg_type_string(msg_type(msg)));
+		if (err == -ENOKEY) {
+			pr_notice("%s: auth: no valid key for %s message", p->log_name, msg_type_string(msg_type(msg)));
+		} else {
+			pr_notice("%s: auth: message authenticated: %s", p->log_name, msg_type_string(msg_type(msg)));
+		}
 	}
 	
 	if (msg_sots_valid(msg)) {
