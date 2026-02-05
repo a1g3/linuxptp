@@ -191,9 +191,6 @@ enum port_state ptp_fsm(enum port_state state, enum fsm_event event, int mdiff)
 		case EV_RS_PASSIVE:
 			next = PS_PASSIVE;
 			break;
-		case EV_SEND_JOIN_REQUEST:
-			next = PS_JOINING;
-			break;
 		default:
 			break;
 		}
@@ -263,7 +260,7 @@ enum port_state ptp_slave_fsm(enum port_state state, enum fsm_event event,
 			next = PS_FAULTY;
 			break;
 		case EV_JOINED:
-			next = PS_UNCALIBRATED;
+			next = PS_SLAVE;
 			break;
 		default:
 			break;
@@ -325,7 +322,7 @@ enum port_state ptp_slave_fsm(enum port_state state, enum fsm_event event,
 			next = PS_LISTENING;
 			break;
 		case EV_MASTER_CLOCK_SELECTED:
-			next = PS_SLAVE;
+			next = PS_JOINING;
 			break;
 		default:
 			break;

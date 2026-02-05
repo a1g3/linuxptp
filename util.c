@@ -61,6 +61,7 @@ const char *ps_str[] = {
 	"UNCALIBRATED",
 	"SLAVE",
 	"GRAND_MASTER",
+	"JOINING",
 };
 
 const char *ev_str[] = {
@@ -81,6 +82,8 @@ const char *ev_str[] = {
 	"RS_GRAND_MASTER",
 	"RS_SLAVE",
 	"RS_PASSIVE",
+	"SEND_JOIN_REQUEST",
+	"JOINED"
 };
 
 const char *ts_str(enum timestamp_type ts)

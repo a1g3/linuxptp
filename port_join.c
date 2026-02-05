@@ -222,8 +222,7 @@ int process_join_response(struct port *p, struct ptp_message *m)
 	print_hex_array((unsigned char *)resp->key, 32);
 	pr_err("%s: JOIN_RESPONSE security readiness check passed", p->log_name);
 
-	p->state = PS_UNCALIBRATED;
-	port_dispatch(p, EV_RS_SLAVE, 1);
+	port_dispatch(p, EV_JOINED, 0);
 
 	return EV_NONE;
 }
