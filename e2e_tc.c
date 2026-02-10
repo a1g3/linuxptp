@@ -180,10 +180,10 @@ enum fsm_event e2e_event(struct port *p, int fd_index)
 			if (err && err != -ENOKEY) {
 				switch (err) {
 				case -EBADMSG:
-					pr_err("%s: auth: bad message", p->log_name);
+					pr_err("%s: auth: bad message %s", p->log_name, msg_type_string(msg_type(msg)));
 					break;
 				case -EPROTO:
-					pr_debug("%s: auth: ignoring message", p->log_name);
+					pr_debug("%s: auth: ignoring message %s", p->log_name, msg_type_string(msg_type(msg)));
 					break;
 				}
 				msg_put(msg);

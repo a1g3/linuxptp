@@ -1021,9 +1021,11 @@ int sad_config_init_join(struct config *cfg, int spp)
 	}
 	STAILQ_FOREACH(sa, &cfg->security_association_database, list) {
 		if (sa->spp == spp) {
+			sad_destroy_association(sa);
 			pr_err("sa %u already taken"
-				" - ignoring", spp);
-			return -1;
+				" - removing", spp);
+			STAILQ_REMOVE(&cfg->security_association_database,
+						sa, security_association, list);
 		}
 	}
 	sa = calloc(1, sizeof(*sa));

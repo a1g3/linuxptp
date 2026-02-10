@@ -475,7 +475,7 @@ int tc_fwd_sync(struct port *q, struct ptp_message *msg)
 	}
 	
 	// AG TODO: Update TLV
-	//sad_update_auth_tlv(clock_config(q->clock), msg);
+	sad_update_auth_tlv(clock_config(q->clock), msg);
 	
 	err = tc_fwd_event(q, msg);
 	if (err) {
