@@ -67,7 +67,9 @@ void p2p_dispatch(struct port *p, enum fsm_event event, int mdiff)
 	 */
 	switch (p->state) {
 	case PS_INITIALIZING:
+		break;
 	case PS_JOINING:
+		port_join(p);
 		break;
 	case PS_FAULTY:
 	case PS_DISABLED:

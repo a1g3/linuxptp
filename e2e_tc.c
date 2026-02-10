@@ -47,7 +47,9 @@ void e2e_dispatch(struct port *p, enum fsm_event event, int mdiff)
 	 */
 	switch (p->state) {
 	case PS_INITIALIZING:
+		break;
 	case PS_JOINING:
+		port_join(p);
 		break;
 	case PS_FAULTY:
 	case PS_DISABLED:
@@ -63,6 +65,8 @@ void e2e_dispatch(struct port *p, enum fsm_event event, int mdiff)
 		break;
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
+		p->spp = p->master_spp;
+		p->active_key_id = p->master_active_key_id;
 		sad_set_last_seqid(clock_config(p->clock), p->spp, -1);
 		break;
 	case PS_PASSIVE:
@@ -170,21 +174,24 @@ enum fsm_event e2e_event(struct port *p, int fd_index)
 		msg_put(dup);
 		dup = NULL;
 	} else {
-		err = sad_process_auth(clock_config(p->clock), p->spp, dup, msg);
-		if (err) {
-			switch (err) {
-			case -EBADMSG:
-				pr_err("%s: auth: bad message", p->log_name);
-				break;
-			case -EPROTO:
-				pr_debug("%s: auth: ignoring message", p->log_name);
-				break;
+		if (msg_type(msg) != JOIN_REQUEST && msg_type(msg) != DELAY_REQ && msg_type(msg) != MANAGEMENT) {
+			err = sad_process_auth(clock_config(p->clock), p->spp, dup, msg);
+			//pr_err("%s: sad_process_auth returned %d", p->log_name, err);
+			if (err && err != -ENOKEY) {
+				switch (err) {
+				case -EBADMSG:
+					pr_err("%s: auth: bad message", p->log_name);
+					break;
+				case -EPROTO:
+					pr_debug("%s: auth: ignoring message", p->log_name);
+					break;
+				}
+				msg_put(msg);
+				if (dup) {
+					msg_put(dup);
+				}
+				return EV_NONE;
 			}
-			msg_put(msg);
-			if (dup) {
-				msg_put(dup);
-			}
-			return EV_NONE;
 		}
 	}
 
@@ -240,6 +247,13 @@ enum fsm_event e2e_event(struct port *p, int fd_index)
 		if (tc_forward(p, msg)) {
 			event = EV_FAULT_DETECTED;
 		}
+		break;
+	case JOIN_REQUEST:
+		if (process_join_request(p, msg))
+			event = EV_FAULT_DETECTED;
+		break;
+	case JOIN_RESPONSE:
+		process_join_response(p, msg);
 		break;
 	}
 

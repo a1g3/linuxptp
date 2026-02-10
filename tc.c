@@ -396,9 +396,14 @@ int tc_forward(struct port *q, struct ptp_message *msg)
 		sad_update_auth_tlv(clock_config(q->clock), msg);
 	}
 
+
 	for (p = clock_first_port(q->clock); p; p = LIST_NEXT(p, list)) {
 		if (tc_blocked(q, p, msg)) {
 			continue;
+		}
+		if (msg_type(msg) == JOIN_REQUEST) {
+			/* Don't forward Announce messages out of the wrong port. */
+			pr_err("%s: Forward JOIN_REQUEST out port %s", p->log_name, p->name);
 		}
 		cnt = transport_send(p->trp, &p->fda, TRANS_GENERAL, msg);
 		if (cnt <= 0) {
@@ -468,6 +473,10 @@ int tc_fwd_sync(struct port *q, struct ptp_message *msg)
 		msg->header.flagField[0]      |= TWO_STEP;
 		sad_update_auth_tlv(clock_config(q->clock), msg);
 	}
+	
+	// AG TODO: Update TLV
+	//sad_update_auth_tlv(clock_config(q->clock), msg);
+	
 	err = tc_fwd_event(q, msg);
 	if (err) {
 		return err;
