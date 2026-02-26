@@ -8,6 +8,10 @@
 #define HAVE_SAD_H
 
 #include <sys/queue.h>
+#include <wolfssl/options.h>
+#include <wolfssl/openssl/ssl.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
+#include <wolfssl/test.h>
 
 #include "pdt.h"
 
@@ -107,5 +111,8 @@ struct security_association_key *sad_get_key_by_id(struct security_association *
 int sad_config_init_join(struct config *cfg, int spp);
 int sad_add_key_join(UInteger64 key_id, unsigned char *key, UInteger32 key_len);
 int sad_readiness_check_join(int spp, size_t active_key_id, struct config *cfg);
+
+int sign_buffer(const unsigned char* buf, unsigned int bufLen, unsigned char* sig, unsigned int* sigLen, const unsigned char* keyDer, unsigned int keyDerLen);
+int verify_buffer(const unsigned char* buf, unsigned int bufLen, const unsigned char* sig, unsigned int sigLen, ecc_key* pubKey);
 
 #endif

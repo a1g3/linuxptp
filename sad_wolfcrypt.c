@@ -9,6 +9,9 @@
 #include <wolfssl/wolfcrypt/hmac.h>
 #include <wolfssl/wolfcrypt/cmac.h>
 #include <wolfssl/wolfcrypt/ed25519.h>
+#include <wolfssl/openssl/ssl.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
+#include <wolfssl/test.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
@@ -20,6 +23,71 @@
 #define MAX_HEX_OUTPUT_LEN 1024
 #define MAX_KEY_LEN 1024
 
+int sign_buffer(const byte* buf, word32 bufLen,
+                byte* sig, word32* sigLen,
+                const byte* keyDer, word32 keyDerLen)
+{
+    int ret = 0;
+    unsigned int idx = 0;
+    ecc_key key;
+    WC_RNG rng;
+    byte hash[SHA256_DIGEST_SIZE];
+
+    wc_ecc_init(&key);
+    wc_InitRng(&rng);
+
+    // Load ECC private key (DER format)
+    ret = wc_EccPrivateKeyDecode(keyDer, &idx, &key, keyDerLen);
+    if (ret != 0) {
+        printf("Failed to decode ECC private key: %d\n", ret);
+        return ret;
+    }
+    // Hash the buffer
+    ret = wc_Sha256Hash(buf, bufLen, hash);
+    if (ret != 0) { 
+        printf("Failed to hash buffer: %d\n", ret);
+        return ret;
+    }
+    // Sign hash
+    ret = wc_ecc_sign_hash(hash, sizeof(hash),
+                           sig, sigLen,
+                           &rng, &key);
+
+    if (ret != 0) {
+        printf("Failed to sign hash: %d\n", ret);
+    }
+
+    wc_ecc_free(&key);
+    wc_FreeRng(&rng);
+
+    return ret;
+}
+
+int verify_buffer(const byte* buf, word32 bufLen,
+                  const byte* sig, word32 sigLen,
+                  ecc_key* pubKey)
+{
+    int ret, verify = 0;
+    byte hash[SHA256_DIGEST_SIZE];
+
+
+    /* Hash message */
+    ret = wc_Sha256Hash(buf, bufLen, hash);
+    if (ret != 0) {
+        printf("Failed to hash buffer: %d\n", ret);
+        return ret;
+    }
+
+    /* Verify signature */
+    ret = wc_ecc_verify_hash(sig, sigLen,
+                             hash, sizeof(hash),
+                             &verify, pubKey);
+
+    if (ret != 0)
+        return ret;
+
+    return (verify == 1) ? 0 : -1;
+}
 
 void print_hex_array(const unsigned char *arr, size_t len) {
     if (!arr || len == 0 || len * 2 + 1 > MAX_HEX_OUTPUT_LEN) {
@@ -69,7 +137,7 @@ struct mac_data *sad_init_mac(integrity_alg_type algorithm,
                 wolfCrypt_Cleanup();
                 return NULL;
             }
-            if (wc_HmacSetKey(mac_data->wolfssl.hmac, SHA256, key1, (word32)key1_len) != 0) {
+            if (wc_HmacSetKey(mac_data->wolfssl.hmac, WC_SHA256, key1, (word32)key1_len) != 0) {
                 pr_err("Failed to set HMAC key");
                 sad_deinit_mac(mac_data);
                 return NULL;

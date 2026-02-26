@@ -29,6 +29,11 @@
 #include "sad.h"
 #include "sad_private.h"
 
+#include <wolfssl/options.h>
+#include <wolfssl/openssl/ssl.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
+#include <wolfssl/test.h>
+
 /**
  * Generate a random nonce for JOIN_REQUEST
  */
@@ -86,6 +91,7 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	struct join_request_msg *req = &m->join_request;
 	struct ptp_message *msg;
 	int err;
+	unsigned char* buffer = NULL;
 
 	/* Validate port state - only process if we are a master */
 	switch (p->state) {
@@ -145,12 +151,13 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	}
 
 	msg->join_response.key_id = ntohl(key->key_id);
+	memset(msg->join_response.cert, 0, sizeof(msg->join_response.cert));
+	memset(msg->join_response.sig, 0, sizeof(msg->join_response.sig));
 	/* For JOIN_RESPONSE, the key is placed directly after the nonce */
 
 	if(key->data->type == WC_ED25519) {
 		unsigned int pubSz = sizeof(msg->join_response.key);
 		int ret = wc_ed25519_export_public(key->data->wolfssl.ed25519_key, msg->join_response.key, &pubSz);
-		pr_err("Exported ED25519 public key of length %u", pubSz);
 		if (ret != 0) {
 			pr_err("%s: failed to export ED25519 public key", p->log_name);
 			msg_put(msg);
@@ -160,8 +167,72 @@ int process_join_request(struct port *p, struct ptp_message *m)
 		memcpy(msg->join_response.key, key->data->key, key->data->key_len);
 	}
 
+	if (strlen(sa->certificate_path) > 0) {
+		FILE* f = fopen(sa->certificate_path, "rb");
+		int length = 0;
+		unsigned char derBuffer[500];
+		int derLength = 0;
+
+		if (f) {
+			fseek(f, 0, SEEK_END); // Seek to the end of the file
+			length = ftell(f);    // Get the file size (offset from the beginning)
+			rewind(f);             // Go back to the start of the file
+
+			// Allocate memory for the entire content plus a null terminator
+			buffer = (unsigned char*)malloc(length * sizeof(char));
+			if (buffer) {
+				// Read the file into the buffer
+				fread(buffer, sizeof(char), length, f);
+			}
+			fclose(f); // Close the file
+		}
+
+		derLength = wc_CertPemToDer(buffer, length, derBuffer, 500, 0); // Get the DER length
+		msg->join_response.cert_len = derLength;
+		memcpy(msg->join_response.cert, derBuffer, derLength);
+		free(buffer);
+	}
+	
 	/* Set destination address */
 	msg->address = m->address;
+
+	if (strlen(sa->certificate_key_path) > 0) {
+		FILE* f = fopen(sa->certificate_key_path, "rb");
+		int length = 0;
+		int ret = 0;
+
+		if (f) {
+			fseek(f, 0, SEEK_END); // Seek to the end of the file
+			length = ftell(f);    // Get the file size (offset from the beginning)
+			rewind(f);             // Go back to the start of the file
+
+			// Allocate memory for the entire content plus a null terminator
+			buffer = (unsigned char*)malloc(length * sizeof(char));
+			if (buffer) {
+				// Read the file into the buffer
+				fread(buffer, sizeof(char), length, f);
+			}
+			fclose(f); // Close the file
+		}
+
+		/* Sign */
+		ret = sign_buffer(
+			(const byte*)msg,
+			sizeof(struct join_response_msg),
+			msg->join_response.sig,
+			&msg->join_response.sig_len,
+			buffer,
+			(word32)length
+		);
+
+		if (ret != 0) {
+			pr_err("%s: failed to sign JOIN_RESPONSE", p->log_name);
+			msg_put(msg);
+			return -1;
+		}
+
+		free(buffer);
+	}
 
 	pr_info("%s: sent JOIN_RESPONSE to %s", p->log_name, pid2str(&m->header.sourcePortIdentity));
 
@@ -184,6 +255,12 @@ int process_join_request(struct port *p, struct ptp_message *m)
 int process_join_response(struct port *p, struct ptp_message *m)
 {
 	struct join_response_msg *resp = &m->join_response;
+	char signature[72];
+	int signature_len = 0;
+	int ret = 0;
+	DecodedCert decodedCert;
+	ecc_key eccKey;
+	unsigned int inOutIdx = 0;
 
 	/* Validate port state - only process if we are a master */
 	switch (p->state) {
@@ -209,6 +286,33 @@ int process_join_response(struct port *p, struct ptp_message *m)
 		return 0;
 	}
 
+	signature_len = resp->sig_len;
+	memcpy(signature, resp->sig, signature_len);
+	memset(resp->sig, 0, sizeof(resp->sig));
+
+	InitDecodedCert(&decodedCert, resp->cert, resp->cert_len, 0);
+
+    ret = ParseCert(&decodedCert, CERT_TYPE, NO_VERIFY, NULL);
+    if (ret != 0) {
+        printf("Failed to parse certificate: %d\n", ret);
+        return -1;
+    }
+    ret = wc_ecc_init(&eccKey);
+    WOLFSSL_BUFFER(decodedCert.publicKey, decodedCert.pubKeySize);
+
+    ret = wc_EccPublicKeyDecode(decodedCert.publicKey, &inOutIdx, &eccKey, decodedCert.pubKeySize);
+    if (ret != 0) {
+        printf("Failed to decode ECC public key: %d\n", ret);
+        return -1;
+    }
+
+	if (verify_buffer((const byte*)resp, sizeof(struct join_response_msg),
+                  (const byte*)signature, signature_len,
+                  &eccKey) != 0) {
+		pr_err("%s: JOIN_RESPONSE signature verification failed", p->log_name);
+		return -1;
+	}
+
 	int sad = sad_config_init_join(clock_config(p->clock), 100);
 	if (sad != 0) {
 		pr_err("%s: JOIN_RESPONSE security association init failed", p->log_name);
@@ -225,14 +329,13 @@ int process_join_response(struct port *p, struct ptp_message *m)
 	p->spp = 100;
 	p->active_key_id = key_id;
 
-	int ret = sad_readiness_check_join(p->spp, p->active_key_id, clock_config(p->clock));
+	ret = sad_readiness_check_join(p->spp, p->active_key_id, clock_config(p->clock));
 	if (ret != 0) {
 		pr_err("%s: JOIN_RESPONSE security readiness check failed", p->log_name);
 		return -1;
 	}
 
 	pr_info("Add Key ID: %d", key_id);
-	print_hex_array((unsigned char *)resp->key, 32);
 	pr_err("%s: JOIN_RESPONSE security readiness check passed", p->log_name);
 
 	port_dispatch(p, EV_JOINED, 0);
