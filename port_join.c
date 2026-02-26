@@ -151,6 +151,8 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	}
 
 	msg->join_response.key_id = ntohl(key->key_id);
+	msg->join_response.currentSeqNum = 0;
+	msg->join_response.spp = ntohl(sppId);
 	memset(msg->join_response.cert, 0, sizeof(msg->join_response.cert));
 	memset(msg->join_response.sig, 0, sizeof(msg->join_response.sig));
 	/* For JOIN_RESPONSE, the key is placed directly after the nonce */
@@ -313,7 +315,8 @@ int process_join_response(struct port *p, struct ptp_message *m)
 		return -1;
 	}
 
-	int sad = sad_config_init_join(clock_config(p->clock), 100);
+	int sad_id = htonl(resp->spp);
+	int sad = sad_config_init_join(clock_config(p->clock), sad_id);
 	if (sad != 0) {
 		pr_err("%s: JOIN_RESPONSE security association init failed", p->log_name);
 		return -1;
@@ -326,7 +329,7 @@ int process_join_response(struct port *p, struct ptp_message *m)
 		return -1;
 	}
 
-	p->spp = 100;
+	p->spp = sad_id;
 	p->active_key_id = key_id;
 
 	ret = sad_readiness_check_join(p->spp, p->active_key_id, clock_config(p->clock));
