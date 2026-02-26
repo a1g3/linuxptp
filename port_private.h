@@ -177,6 +177,7 @@ struct port {
 		int port;
 	} cmlds;
 	struct ProfileIdentity profileIdentity;
+	UInteger64 nonce[16];
 };
 
 #define portnum(p) (p->portIdentity.portNumber)

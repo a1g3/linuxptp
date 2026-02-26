@@ -74,6 +74,7 @@ int port_join(struct port *p)
 
 	/* Generate random nonce */
 	generate_nonce(msg->join_request.nonce);
+	memcpy(p->nonce, msg->join_request.nonce, sizeof(msg->join_request.nonce));
 
 	err = port_prepare_and_send(p, msg, TRANS_EVENT);
 	if (err) {
@@ -285,6 +286,11 @@ int process_join_response(struct port *p, struct ptp_message *m)
 
 	if (msg_type(m) != JOIN_RESPONSE) {
 		pr_err("%s: received non-JOIN_RESPONSE message", p->log_name);
+		return 0;
+	}
+
+	if (memcmp(p->nonce, resp->nonce, sizeof(p->nonce)) != 0) {
+		pr_warning("%s: nonce is different than expected", p->log_name);
 		return 0;
 	}
 
