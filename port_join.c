@@ -32,7 +32,28 @@
 #include <wolfssl/options.h>
 #include <wolfssl/openssl/ssl.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
-#include <wolfssl/test.h>
+
+static int load_local_file(const char* filePath, byte* buffer)
+{
+	FILE* f = fopen(filePath, "rb");
+	int length = 0;
+
+	if (f) {
+		fseek(f, 0, SEEK_END); // Seek to the end of the file
+		length = ftell(f);    // Get the file size (offset from the beginning)
+		rewind(f);             // Go back to the start of the file
+
+		// Allocate memory for the entire content plus a null terminator
+		buffer = (unsigned char*)malloc(length * sizeof(char));
+		if (buffer) {
+			// Read the file into the buffer
+			fread(buffer, sizeof(char), length, f);
+		}
+		fclose(f); // Close the file
+	}
+
+	return length;
+}
 
 /**
  * Generate a random nonce for JOIN_REQUEST
@@ -93,6 +114,7 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	struct ptp_message *msg;
 	int err;
 	unsigned char* buffer = NULL;
+	int ret = 0;
 
 	/* Validate port state - only process if we are a master */
 	switch (p->state) {
@@ -171,28 +193,15 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	}
 
 	if (strlen(sa->certificate_path) > 0) {
-		FILE* f = fopen(sa->certificate_path, "rb");
-		int length = 0;
-		unsigned char derBuffer[500];
-		int derLength = 0;
-
-		if (f) {
-			fseek(f, 0, SEEK_END); // Seek to the end of the file
-			length = ftell(f);    // Get the file size (offset from the beginning)
-			rewind(f);             // Go back to the start of the file
-
-			// Allocate memory for the entire content plus a null terminator
-			buffer = (unsigned char*)malloc(length * sizeof(char));
-			if (buffer) {
-				// Read the file into the buffer
-				fread(buffer, sizeof(char), length, f);
-			}
-			fclose(f); // Close the file
+		int length = load_local_file(sa->certificate_path, buffer);
+		if (length < 0) {
+			pr_err("%s: failed to load certificate from %s", p->log_name, sa->certificate_path);
+			msg_put(msg);
+			return -1;
 		}
 
-		derLength = wc_CertPemToDer(buffer, length, derBuffer, 500, 0); // Get the DER length
-		msg->join_response.cert_len = derLength;
-		memcpy(msg->join_response.cert, derBuffer, derLength);
+		memcpy(msg->join_response.cert, buffer, length);
+		msg->join_response.cert_len = length;
 		free(buffer);
 	}
 	
@@ -200,22 +209,11 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	msg->address = m->address;
 
 	if (strlen(sa->certificate_key_path) > 0) {
-		FILE* f = fopen(sa->certificate_key_path, "rb");
-		int length = 0;
-		int ret = 0;
-
-		if (f) {
-			fseek(f, 0, SEEK_END); // Seek to the end of the file
-			length = ftell(f);    // Get the file size (offset from the beginning)
-			rewind(f);             // Go back to the start of the file
-
-			// Allocate memory for the entire content plus a null terminator
-			buffer = (unsigned char*)malloc(length * sizeof(char));
-			if (buffer) {
-				// Read the file into the buffer
-				fread(buffer, sizeof(char), length, f);
-			}
-			fclose(f); // Close the file
+		int length = load_local_file(sa->certificate_key_path, buffer);
+		if (length < 0) {
+			pr_err("%s: failed to load certificate key from %s", p->log_name, sa->certificate_key_path);
+			msg_put(msg);
+			return -1;
 		}
 
 		/* Sign */
@@ -262,6 +260,9 @@ int process_join_response(struct port *p, struct ptp_message *m)
 	int signature_len = 0;
 	int ret = 0;
 	DecodedCert decodedCert;
+	DecodedCert decodedCA;
+	Signer caSigner;
+	unsigned char* caBuffer = NULL;
 	ecc_key eccKey;
 	unsigned int inOutIdx = 0;
 
@@ -298,9 +299,21 @@ int process_join_response(struct port *p, struct ptp_message *m)
 	memcpy(signature, resp->sig, signature_len);
 	memset(resp->sig, 0, sizeof(resp->sig));
 
-	InitDecodedCert(&decodedCert, resp->cert, resp->cert_len, 0);
+	int length = load_local_file("Test", (byte*)caBuffer);
+	if (length < 0) {
+		pr_err("%s: failed to load CA certificate", p->log_name);
+		return -1;
+	}
+	InitDecodedCert(&decodedCA, caBuffer, length, 0);
+	ret = ParseCert(&decodedCA, CERT_TYPE, NO_VERIFY, NULL);
 
-    ret = ParseCert(&decodedCert, CERT_TYPE, NO_VERIFY, NULL);
+    caSigner.publicKey  = decodedCA.publicKey;
+    caSigner.pubKeySize = decodedCA.pubKeySize;
+    caSigner.keyOID     = decodedCA.keyOID;
+    XMEMCPY(caSigner.subjectNameHash, decodedCA.subjectHash, KEYID_SIZE);
+
+	InitDecodedCert(&decodedCert, resp->cert, resp->cert_len, 0);
+    ret = ParseCert(&decodedCert, CERT_TYPE, VERIFY, &caSigner);
     if (ret != 0) {
         printf("Failed to parse certificate: %d\n", ret);
         return -1;
