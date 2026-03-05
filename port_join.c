@@ -33,6 +33,8 @@
 #include <wolfssl/openssl/ssl.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
 
+#define CA_FILE_PATH "ca_cert.pem"
+
 static int load_local_file(const char* filePath, byte* buffer)
 {
 	FILE* f = fopen(filePath, "rb");
@@ -299,7 +301,7 @@ int process_join_response(struct port *p, struct ptp_message *m)
 	memcpy(signature, resp->sig, signature_len);
 	memset(resp->sig, 0, sizeof(resp->sig));
 
-	int length = load_local_file("Test", (byte*)caBuffer);
+	int length = load_local_file(CA_FILE_PATH, (byte*)caBuffer);
 	if (length < 0) {
 		pr_err("%s: failed to load CA certificate", p->log_name);
 		return -1;
