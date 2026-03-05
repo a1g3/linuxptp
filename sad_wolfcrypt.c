@@ -39,13 +39,13 @@ int sign_buffer(const byte* buf, word32 bufLen,
     // Load ECC private key (DER format)
     ret = wc_EccPrivateKeyDecode(keyDer, &idx, &key, keyDerLen);
     if (ret != 0) {
-        printf("Failed to decode ECC private key: %d\n", ret);
+        pr_err("Failed to decode ECC private key: %d\n", ret);
         return ret;
     }
     // Hash the buffer
     ret = wc_Sha256Hash(buf, bufLen, hash);
     if (ret != 0) { 
-        printf("Failed to hash buffer: %d\n", ret);
+        pr_err("Failed to hash buffer: %d\n", ret);
         return ret;
     }
     // Sign hash
@@ -54,7 +54,7 @@ int sign_buffer(const byte* buf, word32 bufLen,
                            &rng, &key);
 
     if (ret != 0) {
-        printf("Failed to sign hash: %d\n", ret);
+        pr_err("Failed to sign hash: %d\n", ret);
     }
 
     wc_ecc_free(&key);

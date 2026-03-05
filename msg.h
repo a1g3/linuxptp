@@ -184,7 +184,7 @@ struct join_request_msg {
 	struct ptp_header   hdr;
 	UInteger64          nonce[16];
 	uint8_t             suffix[0];
-};
+} PACKED;
 
 struct join_response_msg {
 	struct ptp_header   hdr;
@@ -194,11 +194,11 @@ struct join_response_msg {
 	UInteger32			key_id;
 	uint8_t             key[32];  // Ed25519 public keys are 32 bytes
 	UInteger16			cert_len;
-	uint8_t				cert[500];
+	uint8_t				cert[450];
 	uint32_t			sig_len;
 	uint8_t				sig[72];
 	uint8_t             suffix[0];
-};
+} PACKED;
 
 struct message_data {
 	uint8_t buffer[1500];

@@ -35,7 +35,7 @@
 
 #define CA_FILE_PATH "ca_cert.pem"
 
-static int load_local_file(const char* filePath, byte* buffer)
+static int load_local_file(const char* filePath, byte** buffer)
 {
 	FILE* f = fopen(filePath, "rb");
 	int length = 0;
@@ -46,10 +46,10 @@ static int load_local_file(const char* filePath, byte* buffer)
 		rewind(f);             // Go back to the start of the file
 
 		// Allocate memory for the entire content plus a null terminator
-		buffer = (unsigned char*)malloc(length * sizeof(char));
-		if (buffer) {
+		*buffer = (unsigned char*)malloc(length * sizeof(char));
+		if (*buffer) {
 			// Read the file into the buffer
-			fread(buffer, sizeof(char), length, f);
+			fread(*buffer, sizeof(char), length, f);
 		}
 		fclose(f); // Close the file
 	}
@@ -195,7 +195,7 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	}
 
 	if (strlen(sa->certificate_path) > 0) {
-		int length = load_local_file(sa->certificate_path, buffer);
+		int length = load_local_file(sa->certificate_path, &buffer);
 		if (length < 0) {
 			pr_err("%s: failed to load certificate from %s", p->log_name, sa->certificate_path);
 			msg_put(msg);
@@ -211,12 +211,13 @@ int process_join_request(struct port *p, struct ptp_message *m)
 	msg->address = m->address;
 
 	if (strlen(sa->certificate_key_path) > 0) {
-		int length = load_local_file(sa->certificate_key_path, buffer);
+		int length = load_local_file(sa->certificate_key_path, &buffer);
 		if (length < 0) {
 			pr_err("%s: failed to load certificate key from %s", p->log_name, sa->certificate_key_path);
 			msg_put(msg);
 			return -1;
 		}
+		msg->join_response.sig_len = sizeof(msg->join_response.sig);  // set BEFORE calling sign_buffer
 
 		/* Sign */
 		ret = sign_buffer(
@@ -301,7 +302,7 @@ int process_join_response(struct port *p, struct ptp_message *m)
 	memcpy(signature, resp->sig, signature_len);
 	memset(resp->sig, 0, sizeof(resp->sig));
 
-	int length = load_local_file(CA_FILE_PATH, (byte*)caBuffer);
+	int length = load_local_file(CA_FILE_PATH, (byte**)&caBuffer);
 	if (length < 0) {
 		pr_err("%s: failed to load CA certificate", p->log_name);
 		return -1;
